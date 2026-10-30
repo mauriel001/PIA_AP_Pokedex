@@ -55,3 +55,5 @@ Se agregará los poderes, movimientos y características de cada pokemon
 - Lista de objetos
 - minijuegos ?
 - poder buscar el nombre de un Pokémon
+- poder ver los pokemones en favoritos
+- boton de ajustes
