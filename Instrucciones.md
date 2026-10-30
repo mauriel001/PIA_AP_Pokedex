@@ -37,3 +37,20 @@ Se agregará los poderes, movimientos y características de cada pokemon
 - Se utilizará reactive paper para hacer el diseño de las vistas
 - Sugerencias todas bienvenidas
 - **Rubrica:** [GitHub - luzaracelydls/pia-moviles](https://github.com/luzaracelydls/pia-moviles)
+
+
+## AVANZES
+
+-Se termino la barra de vagacion se puede escoger por generacion y tipo
+
+
+## Terminar
+
+- Falta enlazar la API de pokemon com la vista 1
+- Agregar lso gritos de cada pokemon "cries". La api tiene esa función
+- Terminar las cartas detalladas de cada pokemon
+
+## Posibles Cosas que podemos agregar
+
+- Lista de objetos
+- minijuegos ?
