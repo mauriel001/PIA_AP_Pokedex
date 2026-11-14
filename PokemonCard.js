@@ -1,19 +1,52 @@
 import { View, Text } from "react-native";
 import { Card } from "react-native-paper";
 import { Image } from "expo-image";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import styles from "./styles.js";
 
-export default function PokemonCard() {
+const TIPOS_EN_ESPANOL = {
+    normal: "Normal",
+    fighting: "Lucha",
+    flying: "Volador",
+    poison: "Veneno",
+    ground: "Tierra",
+    rock: "Roca",
+    bug: "Bicho",
+    ghost: "Fantasma",
+    steel: "Acero",
+    fire: "Fuego",
+    water: "Agua",
+    grass: "Planta",
+    electric: "Eléctrico",
+    psychic: "Psíquico",
+    ice: "Hielo",
+    dragon: "Dragón",
+    dark: "Siniestro",
+    fairy: "Hada",
+};
+
+export default function PokemonCard({ pokemon }) {
     return (
         <Card>
             <Card.Content style={styles.rowContainer}>
-                <View>
-                    <Text>#000  Name</Text>
-                    <Text>Planta  Veneno</Text>
+                <View style={styles.pokemonInfo}>
+                    <Text style={styles.pokemonName}>
+                        #{String(pokemon.id).padStart(3, "0")}{" "}
+                        {pokemon.name}
+                    </Text>
+                    <View style={styles.typeContainer}>
+                        {pokemon.types.map((type) => (
+                            <Text key={type} style={styles.pokemonType}>
+                                {TIPOS_EN_ESPANOL[type] ?? type}
+                            </Text>
+                        ))}
+                    </View>
                 </View>
-                <MaterialCommunityIcons name="star-outline" size={24} color="black" />
-                <Image source={{ uri: "https://via.placeholder.com/100" }} style={{ width: 100, height: 100 }} />
+                <Image
+                    source={{ uri: pokemon.image }}
+                    style={styles.pokemonImage}
+                    contentFit="contain"
+                    accessibilityLabel={`Imagen de ${pokemon.name}`}
+                />
             </Card.Content>
         </Card>
     );
