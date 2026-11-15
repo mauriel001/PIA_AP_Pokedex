@@ -37,19 +37,38 @@ const TIPOS = [
     { api: "fairy", nombre: "Hada" },
 ];
 
-export default function Navigation({ children, onSelectGeneration, onSelectType, onPokedex }) {
+export default function Navigation({
+    children,
+    onSelectGeneration,
+    onSelectType,
+    onPokedex,
+    selectedTypes = [],
+}) {
     const [modalActivo, setModalActivo] = useState(null);
+    const [tiposSeleccionados, setTiposSeleccionados] = useState([]);
 
     const cerrar = () => setModalActivo(null);
+    const abrirTipos = () => {
+        setTiposSeleccionados(selectedTypes);
+        setModalActivo("tipo");
+    };
 
     const elegirGeneracion = (gen) => {
         cerrar();
         if (onSelectGeneration) onSelectGeneration(gen.id);
     };
 
-    const elegirTipo = (tipo) => {
+    const elegirTipos = () => {
         cerrar();
-        if (onSelectType) onSelectType(tipo.api);
+        if (onSelectType) onSelectType(tiposSeleccionados);
+    };
+
+    const alternarTipo = (tipo) => {
+        setTiposSeleccionados((seleccionados) =>
+            seleccionados.includes(tipo)
+                ? seleccionados.filter((seleccionado) => seleccionado !== tipo)
+                : [...seleccionados, tipo],
+        );
     };
 
     return (
@@ -61,7 +80,7 @@ export default function Navigation({ children, onSelectGeneration, onSelectType,
                 <Pressable onPress={() => setModalActivo("generacion")}>
                     <Text>Generación</Text>
                 </Pressable>
-                <Pressable onPress={() => setModalActivo("tipo")}>
+                <Pressable onPress={abrirTipos}>
                     <Text>Tipo</Text>
                 </Pressable>
             </Appbar>
@@ -102,16 +121,19 @@ export default function Navigation({ children, onSelectGeneration, onSelectType,
                 contentContainerStyle={{ marginHorizontal: 24 }}
             >
                 <Card>
-                    <Card.Title title="Elige un tipo" />
+                    <Card.Title
+                        title="Elige uno o más tipos"
+                        subtitle={`${tiposSeleccionados.length} seleccionados`}
+                    />
                     <Card.Content>
                         <ScrollView style={{ maxHeight: 400 }}>
                             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
                                 {TIPOS.map((tipo) => (
                                     <Button
                                         key={tipo.api}
-                                        mode="outlined"
+                                        mode={tiposSeleccionados.includes(tipo.api) ? "contained" : "outlined"}
                                         style={{ width: "48%" }}
-                                        onPress={() => elegirTipo(tipo)}
+                                        onPress={() => alternarTipo(tipo.api)}
                                     >
                                         {tipo.nombre}
                                     </Button>
@@ -121,6 +143,7 @@ export default function Navigation({ children, onSelectGeneration, onSelectType,
                     </Card.Content>
                     <Card.Actions>
                         <Button onPress={cerrar}>Cancelar</Button>
+                        <Button onPress={elegirTipos}>Aplicar</Button>
                     </Card.Actions>
                 </Card>
             </Modal>

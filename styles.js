@@ -34,4 +34,20 @@ export default StyleSheet.create({
         width: 100,
         height: 100,
     },
+    emptyList: {
+        flexGrow: 1,
+        justifyContent: "center",
+    },
+    emptyState: {
+        alignItems: "center",
+        gap: 12,
+    },
+    emptyImage: {
+        width: 180,
+        height: 180,
+    },
+    emptyText: {
+        fontSize: 20,
+        fontWeight: "bold",
+    },
 })
