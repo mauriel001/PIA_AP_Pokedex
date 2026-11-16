@@ -6,6 +6,7 @@ import {
   View,
 } from "react-native";
 import { Image } from "expo-image";
+import { useAudioPlayer } from "expo-audio";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useEffect, useRef, useState } from "react";
 import Navigation from "./navigation";
@@ -33,6 +34,10 @@ async function getPokemonDetails(url, signal) {
       pokemon.sprites.other?.["official-artwork"]?.front_default ??
       pokemon.sprites.front_default,
     types: pokemon.types.map(({ type }) => type.name),
+    cry: `https://play.pokemonshowdown.com/audio/cries/${pokemon.name.replace(
+      /[^a-z0-9]/g,
+      "",
+    )}.mp3`,
   };
 }
 
@@ -95,6 +100,7 @@ export default function Main() {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState({ kind: "all" });
   const [selectedPokemon, setSelectedPokemon] = useState(null);
+  const cryPlayer = useAudioPlayer(null);
 
   const controllerRef = useRef(null);
   const loadingMoreRef = useRef(false);
@@ -182,7 +188,13 @@ export default function Main() {
   };
 
   // Al hacer clic en una tarjeta se abre el detalle
-  const handlePokemonPress = (pokemon) => setSelectedPokemon(pokemon);
+  const handlePokemonPress = (pokemon) => {
+    setSelectedPokemon(pokemon);
+    if (pokemon.cry) {
+      cryPlayer.replace(pokemon.cry);
+      cryPlayer.play();
+    }
+  };
 
   // Al usar el menú, se cierra el detalle y se aplica el filtro
   const showPokedex = () => {
