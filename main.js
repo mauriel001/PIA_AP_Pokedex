@@ -1,13 +1,20 @@
-import { ActivityIndicator, FlatList, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  BackHandler,
+  FlatList,
+  Text,
+  View,
+} from "react-native";
 import { Image } from "expo-image";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Navigation from "./navigation";
 import PokemonCard from "./PokemonCard";
+import Detalle from "./Detalle";
 import styles from "./styles.js";
 
 const API_URL = "https://pokeapi.co/api/v2";
-const MAX_CONCURRENT_REQUESTS = 10;
+const PAGE_SIZE = 10;
 
 async function fetchApiData(url, signal) {
   const response = await fetch(url, { signal });
@@ -29,7 +36,9 @@ async function getPokemonDetails(url, signal) {
   };
 }
 
-async function getPokemonData(filter, signal) {
+const getIdFromUrl = (url) => Number(url.split("/").filter(Boolean).pop());
+
+async function getEntries(filter, signal) {
   let entries;
 
   if (filter.kind === "generation") {
@@ -56,70 +65,70 @@ async function getPokemonData(filter, signal) {
     );
     entries = firstType.pokemon
       .filter(({ pokemon }) =>
-        otherTypePokemon.every((pokemonNames) =>
-          pokemonNames.has(pokemon.name),
-        ),
+        otherTypePokemon.every((names) => names.has(pokemon.name)),
       )
       .map(({ pokemon }) => pokemon);
   } else {
-    const pokedex = await fetchApiData(`${API_URL}/pokemon?limit=20`, signal);
+    const pokedex = await fetchApiData(`${API_URL}/pokemon?limit=1025`, signal);
     entries = pokedex.results;
   }
 
-  const pokemonData = new Array(entries.length);
-  let nextIndex = 0;
-  const workerCount = Math.min(MAX_CONCURRENT_REQUESTS, entries.length);
-
-  await Promise.all(
-    Array.from({ length: workerCount }, async () => {
-      while (nextIndex < entries.length) {
-        const index = nextIndex++;
-        pokemonData[index] = await getPokemonDetails(entries[index].url, signal);
-      }
-    }),
+  const unique = new Map(entries.map((entry) => [entry.url, entry]));
+  return [...unique.values()].sort(
+    (a, b) => getIdFromUrl(a.url) - getIdFromUrl(b.url),
   );
+}
 
-  return Array.from(
-    new Map(pokemonData.map((pokemon) => [pokemon.id, pokemon])).values(),
-  )
-    .filter(
-      (pokemon) =>
-        filter.kind !== "type" ||
-        filter.values.every((type) => pokemon.types.includes(type)),
-    )
-    .sort((first, second) => first.id - second.id);
+function getPokemonPage(entries, start, signal) {
+  return Promise.all(
+    entries
+      .slice(start, start + PAGE_SIZE)
+      .map((entry) => getPokemonDetails(entry.url, signal)),
+  );
 }
 
 export default function Main() {
+  const [entries, setEntries] = useState([]);
   const [pokemonData, setPokemonData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState({ kind: "all" });
+  const [selectedPokemon, setSelectedPokemon] = useState(null);
 
+  const controllerRef = useRef(null);
+  const loadingMoreRef = useRef(false);
+
+  // Carga inicial (y cada vez que cambia el filtro)
   useEffect(() => {
     const controller = new AbortController();
+    controllerRef.current = controller;
     let isActive = true;
 
     setLoading(true);
     setError(null);
+    setEntries([]);
+    setPokemonData([]);
+    setLoadingMore(false);
+    loadingMoreRef.current = false;
 
-    getPokemonData(filter, controller.signal)
-      .then((data) => {
-        if (isActive) {
-          setPokemonData(data);
-        }
-      })
-      .catch((error) => {
-        if (isActive) {
-          controller.abort();
-          setError(error.message);
-        }
-      })
-      .finally(() => {
-        if (isActive) {
-          setLoading(false);
-        }
-      });
+    (async () => {
+      try {
+        const allEntries = await getEntries(filter, controller.signal);
+        const firstPage = await getPokemonPage(
+          allEntries,
+          0,
+          controller.signal,
+        );
+        if (!isActive) return;
+        setEntries(allEntries);
+        setPokemonData(firstPage);
+      } catch (error) {
+        if (isActive) setError(error.message);
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    })();
 
     return () => {
       isActive = false;
@@ -127,15 +136,69 @@ export default function Main() {
     };
   }, [filter]);
 
-  const showPokedex = () => setFilter({ kind: "all" });
-  const showGeneration = (generationId) =>
-    setFilter({ kind: "generation", value: generationId });
-  const showTypes = (types) =>
-    setFilter(
-      types.length > 0
-        ? { kind: "type", values: types }
-        : { kind: "all" },
+  // Botón "atrás" de Android: cierra el detalle en vez de salir de la app
+  useEffect(() => {
+    if (!selectedPokemon) return;
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        setSelectedPokemon(null);
+        return true;
+      },
     );
+    return () => subscription.remove();
+  }, [selectedPokemon]);
+
+  // Cargar los siguientes 10
+  const loadMore = async () => {
+    if (
+      loading ||
+      loadingMoreRef.current ||
+      pokemonData.length >= entries.length
+    ) {
+      return;
+    }
+
+    const controller = controllerRef.current;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+
+    try {
+      const nextPage = await getPokemonPage(
+        entries,
+        pokemonData.length,
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      setPokemonData((prev) => [...prev, ...nextPage]);
+    } catch (error) {
+      if (!controller.signal.aborted) console.warn(error.message);
+    } finally {
+      if (!controller.signal.aborted) {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      }
+    }
+  };
+
+  // Al hacer clic en una tarjeta se abre el detalle
+  const handlePokemonPress = (pokemon) => setSelectedPokemon(pokemon);
+
+  // Al usar el menú, se cierra el detalle y se aplica el filtro
+  const showPokedex = () => {
+    setSelectedPokemon(null);
+    setFilter({ kind: "all" });
+  };
+  const showGeneration = (generationId) => {
+    setSelectedPokemon(null);
+    setFilter({ kind: "generation", value: generationId });
+  };
+  const showTypes = (types) => {
+    setSelectedPokemon(null);
+    setFilter(
+      types.length > 0 ? { kind: "type", values: types } : { kind: "all" },
+    );
+  };
 
   return (
     <SafeAreaProvider>
@@ -145,15 +208,32 @@ export default function Main() {
         onSelectType={showTypes}
         selectedTypes={filter.kind === "type" ? filter.values : []}
       >
-        {loading ? (
+        {selectedPokemon ? (
+          <Detalle
+            pokemon={selectedPokemon}
+            onBack={() => setSelectedPokemon(null)}
+          />
+        ) : loading ? (
           <ActivityIndicator accessibilityLabel="Cargando Pokémon" />
         ) : error ? (
           <Text accessibilityRole="alert">{error}</Text>
         ) : (
           <FlatList
             data={pokemonData}
-            renderItem={({ item }) => <PokemonCard pokemon={item} />}
+            renderItem={({ item }) => (
+              <PokemonCard pokemon={item} onPress={handlePokemonPress} />
+            )}
             keyExtractor={(pokemon) => String(pokemon.id)}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              loadingMore ? (
+                <ActivityIndicator
+                  style={{ marginVertical: 16 }}
+                  accessibilityLabel="Cargando más Pokémon"
+                />
+              ) : null
+            }
             contentContainerStyle={[
               styles.scrollView,
               pokemonData.length === 0 && styles.emptyList,

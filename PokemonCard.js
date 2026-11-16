@@ -24,9 +24,13 @@ const TIPOS_EN_ESPANOL = {
     fairy: "Hada",
 };
 
-export default function PokemonCard({ pokemon }) {
+export default function PokemonCard({ pokemon, onPress }) {
     return (
-        <Card>
+        <Card
+            onPress={() => onPress?.(pokemon)}
+            accessibilityRole="button"
+            accessibilityLabel={`Ver detalle de ${pokemon.name}`}
+        >
             <Card.Content style={styles.rowContainer}>
                 <View style={styles.pokemonInfo}>
                     <Text style={styles.pokemonName}>
