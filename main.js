@@ -5,6 +5,7 @@ import {
   Text,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { useAudioPlayer } from "expo-audio";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -15,7 +16,8 @@ import Detalle from "./Detalle";
 import styles from "./styles.js";
 
 const API_URL = "https://pokeapi.co/api/v2";
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 50;
+const FAVORITES_STORAGE_KEY = "@pokedex/favorites";
 
 async function fetchApiData(url, signal) {
   const response = await fetch(url, { signal });
@@ -100,10 +102,51 @@ export default function Main() {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState({ kind: "all" });
   const [selectedPokemon, setSelectedPokemon] = useState(null);
+  const [favorites, setFavorites] = useState([]);
+  const [favoritesReady, setFavoritesReady] = useState(false);
+  const [activeView, setActiveView] = useState("pokedex");
   const cryPlayer = useAudioPlayer(null);
 
   const controllerRef = useRef(null);
   const loadingMoreRef = useRef(false);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadFavorites = async () => {
+      try {
+        const storedFavorites = await AsyncStorage.getItem(
+          FAVORITES_STORAGE_KEY,
+        );
+        if (storedFavorites === null) return;
+
+        const parsedFavorites = JSON.parse(storedFavorites);
+        if (!Array.isArray(parsedFavorites)) {
+          throw new Error("El formato guardado de favoritos no es válido.");
+        }
+        if (isActive) setFavorites(parsedFavorites);
+      } catch (error) {
+        console.warn("No se pudieron cargar los favoritos:", error);
+      } finally {
+        if (isActive) setFavoritesReady(true);
+      }
+    };
+
+    loadFavorites();
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!favoritesReady) return;
+    AsyncStorage.setItem(
+      FAVORITES_STORAGE_KEY,
+      JSON.stringify(favorites),
+    ).catch((error) =>
+      console.warn("No se pudieron guardar los favoritos:", error),
+    );
+  }, [favorites, favoritesReady]);
 
   // Carga inicial (y cada vez que cambia el filtro)
   useEffect(() => {
@@ -195,27 +238,55 @@ export default function Main() {
       cryPlayer.play();
     }
   };
+  const toggleFavorite = (pokemon) => {
+    if (!favoritesReady) return;
+    setFavorites((currentFavorites) =>
+      currentFavorites.some((favorite) => favorite.id === pokemon.id)
+        ? currentFavorites.filter((favorite) => favorite.id !== pokemon.id)
+        : [...currentFavorites, pokemon].sort((a, b) => a.id - b.id),
+    );
+  };
 
   // Al usar el menú, se cierra el detalle y se aplica el filtro
   const showPokedex = () => {
     setSelectedPokemon(null);
+    setActiveView("pokedex");
     setFilter({ kind: "all" });
   };
   const showGeneration = (generationId) => {
     setSelectedPokemon(null);
+    setActiveView("pokedex");
     setFilter({ kind: "generation", value: generationId });
   };
   const showTypes = (types) => {
     setSelectedPokemon(null);
+    setActiveView("pokedex");
     setFilter(
       types.length > 0 ? { kind: "type", values: types } : { kind: "all" },
     );
   };
+  const showFavorites = () => {
+    setSelectedPokemon(null);
+    setActiveView("favorites");
+  };
+
+  const displayedPokemon =
+    activeView === "favorites" ? favorites : pokemonData;
+  const renderPokemonCard = ({ item }) => (
+    <PokemonCard
+      pokemon={item}
+      onPress={handlePokemonPress}
+      isFavorite={favorites.some((favorite) => favorite.id === item.id)}
+      onToggleFavorite={toggleFavorite}
+      favoritesReady={favoritesReady}
+    />
+  );
 
   return (
     <SafeAreaProvider>
       <Navigation
         onPokedex={showPokedex}
+        onShowFavorites={showFavorites}
         onSelectGeneration={showGeneration}
         onSelectType={showTypes}
         selectedTypes={filter.kind === "type" ? filter.values : []}
@@ -225,21 +296,26 @@ export default function Main() {
             pokemon={selectedPokemon}
             onBack={() => setSelectedPokemon(null)}
           />
-        ) : loading ? (
-          <ActivityIndicator accessibilityLabel="Cargando Pokémon" />
-        ) : error ? (
+        ) : activeView === "favorites" && !favoritesReady ? (
+          <ActivityIndicator accessibilityLabel="Cargando favoritos" />
+        ) : activeView === "pokedex" && loading ? (
+          <ActivityIndicator accessibilityLabel="Cargando pokémones" />
+        ) : activeView === "pokedex" && error ? (
           <Text accessibilityRole="alert">{error}</Text>
         ) : (
           <FlatList
-            data={pokemonData}
-            renderItem={({ item }) => (
-              <PokemonCard pokemon={item} onPress={handlePokemonPress} />
-            )}
+            data={displayedPokemon}
+            renderItem={renderPokemonCard}
             keyExtractor={(pokemon) => String(pokemon.id)}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
+            ListHeaderComponent={
+              activeView === "favorites" ? (
+                <Text style={styles.favoriteListTitle}>Pokémones favoritos</Text>
+              ) : null
+            }
+            onEndReached={activeView === "pokedex" ? loadMore : undefined}
+            onEndReachedThreshold={activeView === "pokedex" ? 0.5 : undefined}
             ListFooterComponent={
-              loadingMore ? (
+              activeView === "pokedex" && loadingMore ? (
                 <ActivityIndicator
                   style={{ marginVertical: 16 }}
                   accessibilityLabel="Cargando más Pokémon"
@@ -248,21 +324,31 @@ export default function Main() {
             }
             contentContainerStyle={[
               styles.scrollView,
-              pokemonData.length === 0 && styles.emptyList,
+              displayedPokemon.length === 0 &&
+                activeView === "pokedex" &&
+                styles.emptyList,
             ]}
-            ListEmptyComponent={() => (
-              <View style={styles.emptyState}>
-                <Image
-                  source={{
-                    uri: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/54.png",
-                  }}
-                  style={styles.emptyImage}
-                  contentFit="contain"
-                  accessibilityLabel="Psyduck confundido porque no hay resultados"
-                />
-                <Text style={styles.emptyText}>Sin resultados</Text>
-              </View>
-            )}
+            ListEmptyComponent={
+              activeView === "favorites" ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>
+                    Aún no tienes pokémones favoritos
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <Image
+                    source={{
+                      uri: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/54.png",
+                    }}
+                    style={styles.emptyImage}
+                    contentFit="contain"
+                    accessibilityLabel="Psyduck confundido porque no hay resultados"
+                  />
+                  <Text style={styles.emptyText}>Sin resultados</Text>
+                </View>
+              )
+            }
           />
         )}
       </Navigation>

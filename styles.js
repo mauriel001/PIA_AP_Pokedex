@@ -4,11 +4,22 @@ export default StyleSheet.create({
     navBar: {
         justifyContent: "space-evenly",
     },
-    rowContainer: {
+    bottomBar: {
+        justifyContent: "flex-end",
+    },
+    cardContent: {
         width: "100%",
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    rowContainer: {
+        flex: 1,
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+    },
+    favoriteButton: {
+        margin: 0,
     },
     scrollView: {
         gap: 20,
@@ -47,6 +58,10 @@ export default StyleSheet.create({
         height: 180,
     },
     emptyText: {
+        fontSize: 20,
+        fontWeight: "bold",
+    },
+    favoriteListTitle: {
         fontSize: 20,
         fontWeight: "bold",
     },

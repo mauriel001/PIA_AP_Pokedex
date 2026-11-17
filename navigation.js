@@ -42,6 +42,7 @@ export default function Navigation({
     onSelectGeneration,
     onSelectType,
     onPokedex,
+    onShowFavorites,
     selectedTypes = [],
 }) {
     const [modalActivo, setModalActivo] = useState(null);
@@ -86,6 +87,39 @@ export default function Navigation({
             </Appbar>
 
             <View style={{ flex: 1 }}>{children}</View>
+
+            <Appbar style={styles.bottomBar}>
+                <Appbar.Action
+                    icon="cog-outline"
+                    accessibilityLabel="Opciones"
+                    onPress={() => setModalActivo("opciones")}
+                />
+            </Appbar>
+
+            <Modal
+                visible={modalActivo === "opciones"}
+                onDismiss={cerrar}
+                contentContainerStyle={{ marginHorizontal: 24 }}
+            >
+                <Card>
+                    <Card.Title title="Opciones" />
+                    <Card.Content>
+                        <Button
+                            mode="outlined"
+                            icon="star-outline"
+                            onPress={() => {
+                                cerrar();
+                                onShowFavorites?.();
+                            }}
+                        >
+                            Favoritos
+                        </Button>
+                    </Card.Content>
+                    <Card.Actions>
+                        <Button onPress={cerrar}>Cerrar</Button>
+                    </Card.Actions>
+                </Card>
+            </Modal>
 
             {}
             <Modal
