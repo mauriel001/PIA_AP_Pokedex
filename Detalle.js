@@ -8,8 +8,8 @@ import {
   View,
 } from "react-native";
 import { Card, ProgressBar } from "react-native-paper";
-import { Image } from "expo-image";
 import { colorPastel } from "./colores.js";
+import Alternativas from "./Alternativas";
 
 const API_URL = "https://pokeapi.co/api/v2";
 
@@ -57,6 +57,8 @@ export default function Detalle({ pokemon, onBack }) {
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const colorSeccion = { backgroundColor: colorPastel(pokemon) };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -118,26 +120,7 @@ export default function Detalle({ pokemon, onBack }) {
         <Text style={estilos.textoVolver}>← Volver</Text>
       </Pressable>
 
-      <Card>
-        <Card.Content style={estilos.centrado}>
-          <Image
-            source={{ uri: pokemon.image }}
-            style={estilos.imagen}
-            contentFit="contain"
-            accessibilityLabel={`Imagen de ${pokemon.name}`}
-          />
-          <Text style={estilos.nombre}>
-            #{String(pokemon.id).padStart(3, "0")} {pokemon.name}
-          </Text>
-          <View style={estilos.tipos}>
-            {pokemon.types.map((type) => (
-              <Text key={type} style={estilos.tipo}>
-                {TIPOS_EN_ESPANOL[type] ?? type}
-              </Text>
-            ))}
-          </View>
-        </Card.Content>
-      </Card>
+      <Alternativas pokemon={pokemon} tiposEs={TIPOS_EN_ESPANOL} />
 
       {loading ? (
         <ActivityIndicator
@@ -151,7 +134,7 @@ export default function Detalle({ pokemon, onBack }) {
       ) : (
         <>
           {info.descripcion ? (
-            <Card style={{ backgroundColor: colorPastel(pokemon) }}>
+            <Card style={[estilos.seccion, colorSeccion]}>
               <Card.Content>
                 <Text style={estilos.titulo}>Descripción</Text>
                 <Text>{info.descripcion}</Text>
@@ -159,7 +142,7 @@ export default function Detalle({ pokemon, onBack }) {
             </Card>
           ) : null}
 
-          <Card style={{ backgroundColor: colorPastel(pokemon) }}>
+          <Card style={[estilos.seccion, colorSeccion]}>
             <Card.Content>
               <Text style={estilos.titulo}>Características</Text>
               <Text>Altura: {info.altura} m</Text>
@@ -168,7 +151,7 @@ export default function Detalle({ pokemon, onBack }) {
             </Card.Content>
           </Card>
 
-          <Card style={{ backgroundColor: colorPastel(pokemon) }}>
+          <Card style={[estilos.seccion, colorSeccion]}>
             <Card.Content>
               <Text style={estilos.titulo}>Habilidades</Text>
               {info.habilidades.map((h) => (
@@ -180,7 +163,7 @@ export default function Detalle({ pokemon, onBack }) {
             </Card.Content>
           </Card>
 
-          <Card style={{ backgroundColor: colorPastel(pokemon) }}>
+          <Card style={[estilos.seccion, colorSeccion]}>
             <Card.Content>
               <Text style={estilos.titulo}>Estadísticas base</Text>
               {info.stats.map((s) => (
@@ -205,17 +188,6 @@ const estilos = StyleSheet.create({
   contenedor: { padding: 16, gap: 12 },
   botonVolver: { alignSelf: "flex-start", paddingVertical: 8 },
   textoVolver: { fontSize: 16, fontWeight: "bold" },
-  centrado: { alignItems: "center" },
-  imagen: { width: 220, height: 220 },
-  nombre: { fontSize: 24, fontWeight: "bold", textTransform: "capitalize" },
-  tipos: { flexDirection: "row", gap: 8, marginTop: 8 },
-  tipo: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: "#e8e0f0",
-    overflow: "hidden",
-  },
   seccion: { marginTop: 4 },
   titulo: { fontSize: 18, fontWeight: "bold", marginBottom: 8 },
   fila: { marginBottom: 10 },

@@ -1,5 +1,5 @@
 import { View, Text } from "react-native";
-import { Card } from "react-native-paper";
+import { Card, IconButton } from "react-native-paper";
 import { Image } from "expo-image";
 import styles from "./styles.js";
 import { colorPastel } from "./colores.js";
@@ -25,7 +25,13 @@ const TIPOS_EN_ESPANOL = {
     fairy: "Hada",
 };
 
-export default function PokemonCard({ pokemon, onPress }) {
+export default function PokemonCard({
+    pokemon,
+    onPress,
+    isFavorite = false,
+    onToggleFavorite,
+    favoritesReady = true,
+}) {
     return (
         <Card
             onPress={() => onPress?.(pokemon)}
@@ -33,7 +39,20 @@ export default function PokemonCard({ pokemon, onPress }) {
             accessibilityRole="button"
             accessibilityLabel={`Ver detalle de ${pokemon.name}`}
         >
-            <Card.Content style={styles.rowContainer}>
+            <Card.Content style={[styles.rowContainer, { alignItems: "center" }]}>
+                <IconButton
+                    icon={isFavorite ? "star" : "star-outline"}
+                    iconColor={isFavorite ? "#E0A800" : undefined}
+                    size={28}
+                    disabled={!favoritesReady}
+                    onPress={() => onToggleFavorite?.(pokemon)}
+                    accessibilityLabel={
+                        isFavorite
+                            ? `Quitar a ${pokemon.name} de favoritos`
+                            : `Agregar a ${pokemon.name} a favoritos`
+                    }
+                    style={{ marginLeft: -8 }}
+                />
                 <View style={styles.pokemonInfo}>
                     <Text style={styles.pokemonName}>
                         #{String(pokemon.id).padStart(3, "0")}{" "}

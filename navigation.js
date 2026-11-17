@@ -49,6 +49,7 @@ export default function Navigation({
     onSelectType,
     onPokedex,
     onShowFavorites,
+    onShowItems,
     onSearch,
     searchQuery = "",
     selectedTypes = [],
@@ -104,15 +105,6 @@ export default function Navigation({
                     buttonColor="#E3EEFA"
                     textColor="#1F3A5F"
                     compact
-                    onPress={onShowFavorites}
-                >
-                    Favoritos
-                </Button>
-                <Button
-                    mode="contained-tonal"
-                    buttonColor="#E3EEFA"
-                    textColor="#1F3A5F"
-                    compact
                     onPress={() => setModalActivo("generacion")}
                 >
                     Generación
@@ -162,7 +154,7 @@ export default function Navigation({
             >
                 <Card>
                     <Card.Title title="Opciones" />
-                    <Card.Content>
+                    <Card.Content style={{ gap: 8 }}>
                         <Button
                             mode="outlined"
                             icon="star-outline"
@@ -172,6 +164,16 @@ export default function Navigation({
                             }}
                         >
                             Favoritos
+                        </Button>
+                        <Button
+                            mode="outlined"
+                            icon="bag-personal-outline"
+                            onPress={() => {
+                                cerrar();
+                                onShowItems?.();
+                            }}
+                        >
+                            Objetos
                         </Button>
                     </Card.Content>
                     <Card.Actions>

@@ -14,11 +14,11 @@ import Navigation from "./navigation";
 import PokemonCard from "./PokemonCard";
 import Detalle from "./Detalle";
 import styles from "./styles.js";
+import Objetos from "./Objetos";
 
 const API_URL = "https://pokeapi.co/api/v2";
 const PAGE_SIZE = 50;
 const FAVORITES_STORAGE_KEY = "@pokedex/favorites";
-
 
 async function fetchApiData(url, signal) {
   const response = await fetch(url, { signal });
@@ -118,6 +118,7 @@ export default function Main() {
   const listRef = useRef(null);
   const scrollOffsetRef = useRef(0);
 
+  // Cargar favoritos guardados
   useEffect(() => {
     let isActive = true;
 
@@ -146,6 +147,7 @@ export default function Main() {
     };
   }, []);
 
+  // Guardar favoritos cuando cambian
   useEffect(() => {
     if (!favoritesReady) return;
     AsyncStorage.setItem(
@@ -156,7 +158,7 @@ export default function Main() {
     );
   }, [favorites, favoritesReady]);
 
-
+  // Carga inicial (y cada vez que cambia el filtro)
   useEffect(() => {
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -193,7 +195,7 @@ export default function Main() {
     };
   }, [filter]);
 
-
+  // Restaurar la posición del scroll al cerrar el detalle
   useEffect(() => {
     if (selectedPokemon) return;
     const id = requestAnimationFrame(() => {
@@ -205,7 +207,71 @@ export default function Main() {
     return () => cancelAnimationFrame(id);
   }, [selectedPokemon]);
 
+  // Botón "atrás" de Android: cierra el detalle en vez de salir de la app
+  useEffect(() => {
+    if (!selectedPokemon) return;
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        setSelectedPokemon(null);
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [selectedPokemon]);
 
+  // 🔎 BÚSQUEDA por nombre o número (ahora sí está dentro de Main)
+  useEffect(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    let isActive = true;
+    setSearching(true);
+
+    // Espera 300 ms después de la última tecla para no saturar la API
+    const timer = setTimeout(async () => {
+      try {
+        if (!nameIndexRef.current) {
+          const data = await fetchApiData(
+            `${API_URL}/pokemon?limit=1025`,
+            controller.signal,
+          );
+          nameIndexRef.current = data.results;
+        }
+
+        const matches = nameIndexRef.current
+          .filter(
+            ({ name, url }) =>
+              name.includes(query) || String(getIdFromUrl(url)) === query,
+          )
+          .slice(0, 20);
+
+        const results = await Promise.all(
+          matches.map(({ url }) => getPokemonDetails(url, controller.signal)),
+        );
+        if (isActive) setSearchResults(results.sort((a, b) => a.id - b.id));
+      } catch (error) {
+        if (error.name === "AbortError") return;
+        console.warn("Error en la búsqueda:", error);
+        if (isActive) setSearchResults([]);
+      } finally {
+        if (isActive) setSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      isActive = false;
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchQuery]);
+
+  // Cargar más pokémon al llegar al final de la lista
   const loadMore = async () => {
     if (
       loading ||
@@ -235,55 +301,7 @@ export default function Main() {
         setLoadingMore(false);
       }
     }
-
-    useEffect(() => {
-      const query = searchQuery.trim().toLowerCase();
-      if (!query) {
-        setSearchResults([]);
-        setSearching(false);
-        return;
-      }
-
-      const controller = new AbortController();
-      let isActive = true;
-      setSearching(true);
-
-      const timer = setTimeout(async () => {
-        try {
-          if (!nameIndexRef.current) {
-            const data = await fetchApiData(
-              `${API_URL}/pokemon?limit=1025`,
-              controller.signal,
-            );
-            nameIndexRef.current = data.results;
-          }
-
-          const matches = nameIndexRef.current
-            .filter(
-              ({ name, url }) =>
-                name.includes(query) || String(getIdFromUrl(url)) === query,
-            )
-            .slice(0, 20);
-
-          const results = await Promise.all(
-            matches.map(({ url }) => getPokemonDetails(url, controller.signal)),
-          );
-          if (isActive) setSearchResults(results.sort((a, b) => a.id - b.id));
-        } catch (error) {
-          if (isActive && error.name !== "AbortError") setSearchResults([]);
-        } finally {
-          if (isActive) setSearching(false);
-        }
-      }, 300);
-
-      return () => {
-        isActive = false;
-        clearTimeout(timer);
-        controller.abort();
-      };
-    }, [searchQuery]);
   };
-
 
   const handlePokemonPress = (pokemon) => {
     setSelectedPokemon(pokemon);
@@ -292,6 +310,7 @@ export default function Main() {
       cryPlayer.play();
     }
   };
+
   const toggleFavorite = (pokemon) => {
     if (!favoritesReady) return;
     setFavorites((currentFavorites) =>
@@ -301,36 +320,49 @@ export default function Main() {
     );
   };
 
-
   const showPokedex = () => {
     setSearchQuery("");
     scrollOffsetRef.current = 0;
     setSelectedPokemon(null);
+    setActiveView("pokedex");
     setFilter({ kind: "all" });
   };
   const showGeneration = (generationId) => {
     setSearchQuery("");
     scrollOffsetRef.current = 0;
     setSelectedPokemon(null);
+    setActiveView("pokedex");
     setFilter({ kind: "generation", value: generationId });
   };
   const showTypes = (types) => {
     setSearchQuery("");
     scrollOffsetRef.current = 0;
     setSelectedPokemon(null);
+    setActiveView("pokedex");
     setFilter(
       types.length > 0 ? { kind: "type", values: types } : { kind: "all" },
     );
   };
   const showFavorites = () => {
+    setSearchQuery("");
+    scrollOffsetRef.current = 0;
     setSelectedPokemon(null);
     setActiveView("favorites");
   };
 
+  const showItems = () => {
+    setSearchQuery("");
+    scrollOffsetRef.current = 0;
+    setSelectedPokemon(null);
+    setActiveView("items");
+  };
+
   const displayedPokemon =
     activeView === "favorites" ? favorites : pokemonData;
-  const isSearching = searchQuery.trim().length > 0;
+  const isSearching =
+    activeView !== "items" && searchQuery.trim().length > 0;
   const listData = isSearching ? searchResults : displayedPokemon;
+
   const renderPokemonCard = ({ item }) => (
     <PokemonCard
       pokemon={item}
@@ -346,6 +378,7 @@ export default function Main() {
       <Navigation
         onPokedex={showPokedex}
         onShowFavorites={showFavorites}
+        onShowItems={showItems}
         onSelectGeneration={showGeneration}
         onSelectType={showTypes}
         selectedTypes={filter.kind === "type" ? filter.values : []}
@@ -355,7 +388,9 @@ export default function Main() {
         }}
         searchQuery={searchQuery}
       >
-        {!isSearching && activeView === "favorites" && !favoritesReady ? (
+        {activeView === "items" ? (
+          <Objetos />
+        ) : !isSearching && activeView === "favorites" && !favoritesReady ? (
           <ActivityIndicator accessibilityLabel="Cargando favoritos" />
         ) : !isSearching && activeView === "pokedex" && loading ? (
           <ActivityIndicator accessibilityLabel="Cargando pokémones" />
