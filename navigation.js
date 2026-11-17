@@ -1,7 +1,13 @@
-import { useState } from 'react';
-import { View, Pressable, Text, ScrollView } from 'react-native';
-import { Appbar, Modal, Card, Button } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState } from "react";
+import { View, ScrollView } from "react-native";
+import {
+    Appbar,
+    Modal,
+    Card,
+    Button,
+    Searchbar,
+} from "react-native-paper";
+import { SafeAreaView } from "react-native-safe-area-context";
 import styles from "./styles";
 
 const GENERACIONES = [
@@ -43,15 +49,24 @@ export default function Navigation({
     onSelectType,
     onPokedex,
     onShowFavorites,
+    onSearch,
+    searchQuery = "",
     selectedTypes = [],
 }) {
     const [modalActivo, setModalActivo] = useState(null);
     const [tiposSeleccionados, setTiposSeleccionados] = useState([]);
+    const [buscando, setBuscando] = useState(false);
 
     const cerrar = () => setModalActivo(null);
+
     const abrirTipos = () => {
         setTiposSeleccionados(selectedTypes);
         setModalActivo("tipo");
+    };
+
+    const alternarBusqueda = () => {
+        if (buscando) onSearch?.(""); // al cerrar, se limpia la búsqueda
+        setBuscando(!buscando);
     };
 
     const elegirGeneracion = (gen) => {
@@ -75,16 +90,60 @@ export default function Navigation({
     return (
         <SafeAreaView style={{ flex: 1 }}>
             <Appbar style={styles.navBar}>
-                <Pressable onPress={onPokedex}>
-                    <Text>Pokedex</Text>
-                </Pressable>
-                <Pressable onPress={() => setModalActivo("generacion")}>
-                    <Text>Generación</Text>
-                </Pressable>
-                <Pressable onPress={abrirTipos}>
-                    <Text>Tipo</Text>
-                </Pressable>
+                <Button
+                    mode="contained-tonal"
+                    buttonColor="#E3EEFA"
+                    textColor="#1F3A5F"
+                    compact
+                    onPress={onPokedex}
+                >
+                    Pokedex
+                </Button>
+                <Button
+                    mode="contained-tonal"
+                    buttonColor="#E3EEFA"
+                    textColor="#1F3A5F"
+                    compact
+                    onPress={onShowFavorites}
+                >
+                    Favoritos
+                </Button>
+                <Button
+                    mode="contained-tonal"
+                    buttonColor="#E3EEFA"
+                    textColor="#1F3A5F"
+                    compact
+                    onPress={() => setModalActivo("generacion")}
+                >
+                    Generación
+                </Button>
+                <Button
+                    mode="contained-tonal"
+                    buttonColor="#E3EEFA"
+                    textColor="#1F3A5F"
+                    compact
+                    onPress={abrirTipos}
+                >
+                    Tipo
+                </Button>
+                <Appbar.Action
+                    icon={buscando ? "close" : "magnify"}
+                    onPress={alternarBusqueda}
+                    accessibilityLabel={
+                        buscando ? "Cerrar búsqueda" : "Buscar pokémon"
+                    }
+                />
             </Appbar>
+
+            {buscando ? (
+                <Searchbar
+                    placeholder="Nombre o número"
+                    value={searchQuery}
+                    onChangeText={(texto) => onSearch?.(texto)}
+                    autoFocus
+                    style={{ margin: 8 }}
+                />
+            ) : null}
 
             <View style={{ flex: 1 }}>{children}</View>
 
@@ -121,7 +180,6 @@ export default function Navigation({
                 </Card>
             </Modal>
 
-            {}
             <Modal
                 visible={modalActivo === "generacion"}
                 onDismiss={cerrar}
@@ -130,7 +188,10 @@ export default function Navigation({
                 <Card>
                     <Card.Title title="Elige una generación" />
                     <Card.Content>
-                        <ScrollView style={{ maxHeight: 400 }} contentContainerStyle={{ gap: 8 }}>
+                        <ScrollView
+                            style={{ maxHeight: 400 }}
+                            contentContainerStyle={{ gap: 8 }}
+                        >
                             {GENERACIONES.map((gen) => (
                                 <Button
                                     key={gen.id}
@@ -148,7 +209,6 @@ export default function Navigation({
                 </Card>
             </Modal>
 
-            {}
             <Modal
                 visible={modalActivo === "tipo"}
                 onDismiss={cerrar}
@@ -161,11 +221,21 @@ export default function Navigation({
                     />
                     <Card.Content>
                         <ScrollView style={{ maxHeight: 400 }}>
-                            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                            <View
+                                style={{
+                                    flexDirection: "row",
+                                    flexWrap: "wrap",
+                                    gap: 8,
+                                }}
+                            >
                                 {TIPOS.map((tipo) => (
                                     <Button
                                         key={tipo.api}
-                                        mode={tiposSeleccionados.includes(tipo.api) ? "contained" : "outlined"}
+                                        mode={
+                                            tiposSeleccionados.includes(tipo.api)
+                                                ? "contained"
+                                                : "outlined"
+                                        }
                                         style={{ width: "48%" }}
                                         onPress={() => alternarTipo(tipo.api)}
                                     >

@@ -19,6 +19,7 @@ const API_URL = "https://pokeapi.co/api/v2";
 const PAGE_SIZE = 50;
 const FAVORITES_STORAGE_KEY = "@pokedex/favorites";
 
+
 async function fetchApiData(url, signal) {
   const response = await fetch(url, { signal });
   if (!response.ok) {
@@ -106,9 +107,16 @@ export default function Main() {
   const [favoritesReady, setFavoritesReady] = useState(false);
   const [activeView, setActiveView] = useState("pokedex");
   const cryPlayer = useAudioPlayer(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const nameIndexRef = useRef(null);
 
   const controllerRef = useRef(null);
   const loadingMoreRef = useRef(false);
+
+  const listRef = useRef(null);
+  const scrollOffsetRef = useRef(0);
 
   useEffect(() => {
     let isActive = true;
@@ -148,7 +156,7 @@ export default function Main() {
     );
   }, [favorites, favoritesReady]);
 
-  // Carga inicial (y cada vez que cambia el filtro)
+
   useEffect(() => {
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -185,20 +193,19 @@ export default function Main() {
     };
   }, [filter]);
 
-  // Botón "atrás" de Android: cierra el detalle en vez de salir de la app
+
   useEffect(() => {
-    if (!selectedPokemon) return;
-    const subscription = BackHandler.addEventListener(
-      "hardwareBackPress",
-      () => {
-        setSelectedPokemon(null);
-        return true;
-      },
-    );
-    return () => subscription.remove();
+    if (selectedPokemon) return;
+    const id = requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({
+        offset: scrollOffsetRef.current,
+        animated: false,
+      });
+    });
+    return () => cancelAnimationFrame(id);
   }, [selectedPokemon]);
 
-  // Cargar los siguientes 10
+
   const loadMore = async () => {
     if (
       loading ||
@@ -228,9 +235,56 @@ export default function Main() {
         setLoadingMore(false);
       }
     }
+
+    useEffect(() => {
+      const query = searchQuery.trim().toLowerCase();
+      if (!query) {
+        setSearchResults([]);
+        setSearching(false);
+        return;
+      }
+
+      const controller = new AbortController();
+      let isActive = true;
+      setSearching(true);
+
+      const timer = setTimeout(async () => {
+        try {
+          if (!nameIndexRef.current) {
+            const data = await fetchApiData(
+              `${API_URL}/pokemon?limit=1025`,
+              controller.signal,
+            );
+            nameIndexRef.current = data.results;
+          }
+
+          const matches = nameIndexRef.current
+            .filter(
+              ({ name, url }) =>
+                name.includes(query) || String(getIdFromUrl(url)) === query,
+            )
+            .slice(0, 20);
+
+          const results = await Promise.all(
+            matches.map(({ url }) => getPokemonDetails(url, controller.signal)),
+          );
+          if (isActive) setSearchResults(results.sort((a, b) => a.id - b.id));
+        } catch (error) {
+          if (isActive && error.name !== "AbortError") setSearchResults([]);
+        } finally {
+          if (isActive) setSearching(false);
+        }
+      }, 300);
+
+      return () => {
+        isActive = false;
+        clearTimeout(timer);
+        controller.abort();
+      };
+    }, [searchQuery]);
   };
 
-  // Al hacer clic en una tarjeta se abre el detalle
+
   const handlePokemonPress = (pokemon) => {
     setSelectedPokemon(pokemon);
     if (pokemon.cry) {
@@ -247,20 +301,23 @@ export default function Main() {
     );
   };
 
-  // Al usar el menú, se cierra el detalle y se aplica el filtro
+
   const showPokedex = () => {
+    setSearchQuery("");
+    scrollOffsetRef.current = 0;
     setSelectedPokemon(null);
-    setActiveView("pokedex");
     setFilter({ kind: "all" });
   };
   const showGeneration = (generationId) => {
+    setSearchQuery("");
+    scrollOffsetRef.current = 0;
     setSelectedPokemon(null);
-    setActiveView("pokedex");
     setFilter({ kind: "generation", value: generationId });
   };
   const showTypes = (types) => {
+    setSearchQuery("");
+    scrollOffsetRef.current = 0;
     setSelectedPokemon(null);
-    setActiveView("pokedex");
     setFilter(
       types.length > 0 ? { kind: "type", values: types } : { kind: "all" },
     );
@@ -272,6 +329,8 @@ export default function Main() {
 
   const displayedPokemon =
     activeView === "favorites" ? favorites : pokemonData;
+  const isSearching = searchQuery.trim().length > 0;
+  const listData = isSearching ? searchResults : displayedPokemon;
   const renderPokemonCard = ({ item }) => (
     <PokemonCard
       pokemon={item}
@@ -290,66 +349,109 @@ export default function Main() {
         onSelectGeneration={showGeneration}
         onSelectType={showTypes}
         selectedTypes={filter.kind === "type" ? filter.values : []}
+        onSearch={(texto) => {
+          scrollOffsetRef.current = 0;
+          setSearchQuery(texto);
+        }}
+        searchQuery={searchQuery}
       >
-        {selectedPokemon ? (
-          <Detalle
-            pokemon={selectedPokemon}
-            onBack={() => setSelectedPokemon(null)}
-          />
-        ) : activeView === "favorites" && !favoritesReady ? (
+        {!isSearching && activeView === "favorites" && !favoritesReady ? (
           <ActivityIndicator accessibilityLabel="Cargando favoritos" />
-        ) : activeView === "pokedex" && loading ? (
+        ) : !isSearching && activeView === "pokedex" && loading ? (
           <ActivityIndicator accessibilityLabel="Cargando pokémones" />
-        ) : activeView === "pokedex" && error ? (
+        ) : !isSearching && activeView === "pokedex" && error ? (
           <Text accessibilityRole="alert">{error}</Text>
         ) : (
-          <FlatList
-            data={displayedPokemon}
-            renderItem={renderPokemonCard}
-            keyExtractor={(pokemon) => String(pokemon.id)}
-            ListHeaderComponent={
-              activeView === "favorites" ? (
-                <Text style={styles.favoriteListTitle}>Pokémones favoritos</Text>
-              ) : null
-            }
-            onEndReached={activeView === "pokedex" ? loadMore : undefined}
-            onEndReachedThreshold={activeView === "pokedex" ? 0.5 : undefined}
-            ListFooterComponent={
-              activeView === "pokedex" && loadingMore ? (
-                <ActivityIndicator
-                  style={{ marginVertical: 16 }}
-                  accessibilityLabel="Cargando más Pokémon"
-                />
-              ) : null
-            }
-            contentContainerStyle={[
-              styles.scrollView,
-              displayedPokemon.length === 0 &&
-                activeView === "pokedex" &&
-                styles.emptyList,
-            ]}
-            ListEmptyComponent={
-              activeView === "favorites" ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>
-                    Aún no tienes pokémones favoritos
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.emptyState}>
-                  <Image
-                    source={{
-                      uri: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/54.png",
-                    }}
-                    style={styles.emptyImage}
-                    contentFit="contain"
-                    accessibilityLabel="Psyduck confundido porque no hay resultados"
-                  />
-                  <Text style={styles.emptyText}>Sin resultados</Text>
-                </View>
-              )
-            }
-          />
+          <>
+            <View
+              style={{ flex: 1, display: selectedPokemon ? "none" : "flex" }}
+            >
+              <FlatList
+                ref={listRef}
+                data={listData}
+                renderItem={renderPokemonCard}
+                keyExtractor={(pokemon) => String(pokemon.id)}
+                onScroll={(event) => {
+                  if (!selectedPokemon) {
+                    scrollOffsetRef.current =
+                      event.nativeEvent.contentOffset.y;
+                  }
+                }}
+                scrollEventThrottle={16}
+                ListHeaderComponent={
+                  isSearching ? (
+                    <Text style={styles.favoriteListTitle}>
+                      Resultados para "{searchQuery.trim()}"
+                    </Text>
+                  ) : activeView === "favorites" ? (
+                    <Text style={styles.favoriteListTitle}>
+                      Pokémones favoritos
+                    </Text>
+                  ) : null
+                }
+                onEndReached={
+                  activeView === "pokedex" && !isSearching
+                    ? loadMore
+                    : undefined
+                }
+                onEndReachedThreshold={
+                  activeView === "pokedex" && !isSearching ? 0.5 : undefined
+                }
+                ListFooterComponent={
+                  !isSearching && activeView === "pokedex" && loadingMore ? (
+                    <ActivityIndicator
+                      style={{ marginVertical: 16 }}
+                      accessibilityLabel="Cargando más Pokémon"
+                    />
+                  ) : null
+                }
+                contentContainerStyle={[
+                  styles.scrollView,
+                  listData.length === 0 &&
+                  (isSearching || activeView === "pokedex") &&
+                  styles.emptyList,
+                ]}
+                ListEmptyComponent={
+                  isSearching ? (
+                    searching ? (
+                      <ActivityIndicator accessibilityLabel="Buscando" />
+                    ) : (
+                      <View style={styles.emptyState}>
+                        <Text style={styles.emptyText}>
+                          Sin resultados para "{searchQuery.trim()}"
+                        </Text>
+                      </View>
+                    )
+                  ) : activeView === "favorites" ? (
+                    <View style={styles.emptyState}>
+                      <Text style={styles.emptyText}>
+                        Aún no tienes pokémones favoritos
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.emptyState}>
+                      <Image
+                        source={{
+                          uri: "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/54.png",
+                        }}
+                        style={styles.emptyImage}
+                        contentFit="contain"
+                        accessibilityLabel="Psyduck confundido porque no hay resultados"
+                      />
+                      <Text style={styles.emptyText}>Sin resultados</Text>
+                    </View>
+                  )
+                }
+              />
+            </View>
+
+            {selectedPokemon ? (
+              <Detalle
+                pokemon={selectedPokemon}
+                onBack={() => setSelectedPokemon(null)}
+              />
+            ) : null}
+          </>
         )}
       </Navigation>
     </SafeAreaProvider>

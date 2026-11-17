@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Card, ProgressBar } from "react-native-paper";
 import { Image } from "expo-image";
+import { colorPastel } from "./colores.js";
 
 const API_URL = "https://pokeapi.co/api/v2";
 
@@ -150,7 +151,7 @@ export default function Detalle({ pokemon, onBack }) {
       ) : (
         <>
           {info.descripcion ? (
-            <Card style={estilos.seccion}>
+            <Card style={{ backgroundColor: colorPastel(pokemon) }}>
               <Card.Content>
                 <Text style={estilos.titulo}>Descripción</Text>
                 <Text>{info.descripcion}</Text>
@@ -158,7 +159,7 @@ export default function Detalle({ pokemon, onBack }) {
             </Card>
           ) : null}
 
-          <Card style={estilos.seccion}>
+          <Card style={{ backgroundColor: colorPastel(pokemon) }}>
             <Card.Content>
               <Text style={estilos.titulo}>Características</Text>
               <Text>Altura: {info.altura} m</Text>
@@ -167,7 +168,7 @@ export default function Detalle({ pokemon, onBack }) {
             </Card.Content>
           </Card>
 
-          <Card style={estilos.seccion}>
+          <Card style={{ backgroundColor: colorPastel(pokemon) }}>
             <Card.Content>
               <Text style={estilos.titulo}>Habilidades</Text>
               {info.habilidades.map((h) => (
@@ -179,7 +180,7 @@ export default function Detalle({ pokemon, onBack }) {
             </Card.Content>
           </Card>
 
-          <Card style={estilos.seccion}>
+          <Card style={{ backgroundColor: colorPastel(pokemon) }}>
             <Card.Content>
               <Text style={estilos.titulo}>Estadísticas base</Text>
               {info.stats.map((s) => (

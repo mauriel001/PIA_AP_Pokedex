@@ -1,7 +1,8 @@
-import { Pressable, View, Text } from "react-native";
-import { Card, IconButton } from "react-native-paper";
+import { View, Text } from "react-native";
+import { Card } from "react-native-paper";
 import { Image } from "expo-image";
 import styles from "./styles.js";
+import { colorPastel } from "./colores.js";
 
 const TIPOS_EN_ESPANOL = {
     normal: "Normal",
@@ -24,54 +25,33 @@ const TIPOS_EN_ESPANOL = {
     fairy: "Hada",
 };
 
-export default function PokemonCard({
-    pokemon,
-    onPress,
-    isFavorite = false,
-    onToggleFavorite,
-    favoritesReady = true,
-}) {
+export default function PokemonCard({ pokemon, onPress }) {
     return (
-        <Card>
-            <Card.Content style={styles.cardContent}>
-                <Pressable
-                    style={styles.rowContainer}
-                    onPress={() => onPress?.(pokemon)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Ver detalle de ${pokemon.name}`}
-                >
-                    <View style={styles.pokemonInfo}>
-                        <Text style={styles.pokemonName}>
-                            #{String(pokemon.id).padStart(3, "0")}{" "}
-                            {pokemon.name}
-                        </Text>
-                        <View style={styles.typeContainer}>
-                            {pokemon.types.map((type) => (
-                                <Text key={type} style={styles.pokemonType}>
-                                    {TIPOS_EN_ESPANOL[type] ?? type}
-                                </Text>
-                            ))}
-                        </View>
+        <Card
+            onPress={() => onPress?.(pokemon)}
+            style={{ backgroundColor: colorPastel(pokemon) }}
+            accessibilityRole="button"
+            accessibilityLabel={`Ver detalle de ${pokemon.name}`}
+        >
+            <Card.Content style={styles.rowContainer}>
+                <View style={styles.pokemonInfo}>
+                    <Text style={styles.pokemonName}>
+                        #{String(pokemon.id).padStart(3, "0")}{" "}
+                        {pokemon.name}
+                    </Text>
+                    <View style={styles.typeContainer}>
+                        {pokemon.types.map((type) => (
+                            <Text key={type} style={styles.pokemonType}>
+                                {TIPOS_EN_ESPANOL[type] ?? type}
+                            </Text>
+                        ))}
                     </View>
-                    <Image
-                        source={{ uri: pokemon.image }}
-                        style={styles.pokemonImage}
-                        contentFit="contain"
-                        accessibilityLabel={`Imagen de ${pokemon.name}`}
-                    />
-                </Pressable>
-                <IconButton
-                    icon={isFavorite ? "star" : "star-outline"}
-                    iconColor={isFavorite ? "#F4B400" : undefined}
-                    style={styles.favoriteButton}
-                    disabled={!favoritesReady}
-                    onPress={() => onToggleFavorite?.(pokemon)}
-                    accessibilityLabel={
-                        isFavorite
-                            ? `Quitar a ${pokemon.name} de favoritos`
-                            : `Agregar a ${pokemon.name} a favoritos`
-                    }
-                    accessibilityState={{ selected: isFavorite }}
+                </View>
+                <Image
+                    source={{ uri: pokemon.image }}
+                    style={styles.pokemonImage}
+                    contentFit="contain"
+                    accessibilityLabel={`Imagen de ${pokemon.name}`}
                 />
             </Card.Content>
         </Card>
