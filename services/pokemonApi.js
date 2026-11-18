@@ -27,44 +27,46 @@ async function getPokemonDetails(url, signal) {
 
 const getIdFromUrl = (url) => Number(url.split("/").filter(Boolean).pop());
 
-async function getEntries(filter, signal) {
-  let entries;
+async function getEntries(filters, favorites, signal) {
+  const pokedex = await fetchApiData(`${API_URL}/pokemon?limit=1025`, signal);
+  let entries = pokedex.results;
 
-  if (filter.kind === "generation") {
+  if (filters.generation !== null) {
     const generation = await fetchApiData(
-      `${API_URL}/generation/${filter.value}/`,
+      `${API_URL}/generation/${filters.generation}/`,
       signal,
     );
-    entries = generation.pokemon_species.map(({ url }) => {
-      const speciesId = url.split("/").filter(Boolean).pop();
-      if (!speciesId) {
-        throw new Error("PokéAPI devolvió una especie sin identificador.");
-      }
-      return { url: `${API_URL}/pokemon/${speciesId}/` };
-    });
-  } else if (filter.kind === "type") {
+    const generationIds = new Set(
+      generation.pokemon_species.map(({ url }) => getIdFromUrl(url)),
+    );
+    entries = entries.filter((entry) =>
+      generationIds.has(getIdFromUrl(entry.url)),
+    );
+  }
+
+  if (filters.types.length > 0) {
     const typeResponses = await Promise.all(
-      filter.values.map((type) =>
+      filters.types.map((type) =>
         fetchApiData(`${API_URL}/type/${type}/`, signal),
       ),
     );
-    const [firstType, ...otherTypes] = typeResponses;
-    const otherTypePokemon = otherTypes.map(
-      (type) => new Set(type.pokemon.map(({ pokemon }) => pokemon.name)),
+    const pokemonByType = typeResponses.map(
+      (type) =>
+        new Set(type.pokemon.map(({ pokemon }) => pokemon.name)),
     );
-    entries = firstType.pokemon
-      .filter(({ pokemon }) =>
-        otherTypePokemon.every((names) => names.has(pokemon.name)),
-      )
-      .map(({ pokemon }) => pokemon);
-  } else {
-    const pokedex = await fetchApiData(`${API_URL}/pokemon?limit=1025`, signal);
-    entries = pokedex.results;
+    entries = entries.filter((entry) =>
+      pokemonByType.every((pokemonNames) => pokemonNames.has(entry.name)),
+    );
   }
 
-  // Elimina duplicados y conserva el orden numérico de la Pokédex.
-  const unique = new Map(entries.map((entry) => [entry.url, entry]));
-  return [...unique.values()].sort(
+  if (filters.favoritesOnly) {
+    const favoriteIds = new Set(favorites.map(({ id }) => id));
+    entries = entries.filter((entry) =>
+      favoriteIds.has(getIdFromUrl(entry.url)),
+    );
+  }
+
+  return entries.sort(
     (a, b) => getIdFromUrl(a.url) - getIdFromUrl(b.url),
   );
 }

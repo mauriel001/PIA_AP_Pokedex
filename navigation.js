@@ -1,269 +1,231 @@
 import { useState } from "react";
-import { Text, View, ScrollView } from "react-native";
+import { Text, View } from "react-native";
 import { Image } from "expo-image";
-import {
-    Appbar,
-    Modal,
-    Card,
-    Button,
-    Searchbar,
-} from "react-native-paper";
+import { Appbar, Button, Searchbar } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import styles from "./styles";
+import ListaDespegable from "./ListaDespegable";
+import styles, { colors } from "./styles";
 
 const GENERACIONES = [
-    { id: 1, nombre: "Generación I", region: "Kanto" },
-    { id: 2, nombre: "Generación II", region: "Johto" },
-    { id: 3, nombre: "Generación III", region: "Hoenn" },
-    { id: 4, nombre: "Generación IV", region: "Sinnoh" },
-    { id: 5, nombre: "Generación V", region: "Teselia" },
-    { id: 6, nombre: "Generación VI", region: "Kalos" },
-    { id: 7, nombre: "Generación VII", region: "Alola" },
-    { id: 8, nombre: "Generación VIII", region: "Galar" },
-    { id: 9, nombre: "Generación IX", region: "Paldea" },
+  { value: 1, label: "Generación I · Kanto", shortName: "Gen. I" },
+  { value: 2, label: "Generación II · Johto", shortName: "Gen. II" },
+  { value: 3, label: "Generación III · Hoenn", shortName: "Gen. III" },
+  { value: 4, label: "Generación IV · Sinnoh", shortName: "Gen. IV" },
+  { value: 5, label: "Generación V · Teselia", shortName: "Gen. V" },
+  { value: 6, label: "Generación VI · Kalos", shortName: "Gen. VI" },
+  { value: 7, label: "Generación VII · Alola", shortName: "Gen. VII" },
+  { value: 8, label: "Generación VIII · Galar", shortName: "Gen. VIII" },
+  { value: 9, label: "Generación IX · Paldea", shortName: "Gen. IX" },
 ];
 
 const TIPOS = [
-    { api: "normal", nombre: "Normal" },
-    { api: "fighting", nombre: "Lucha" },
-    { api: "flying", nombre: "Volador" },
-    { api: "poison", nombre: "Veneno" },
-    { api: "ground", nombre: "Tierra" },
-    { api: "rock", nombre: "Roca" },
-    { api: "bug", nombre: "Bicho" },
-    { api: "ghost", nombre: "Fantasma" },
-    { api: "steel", nombre: "Acero" },
-    { api: "fire", nombre: "Fuego" },
-    { api: "water", nombre: "Agua" },
-    { api: "grass", nombre: "Planta" },
-    { api: "electric", nombre: "Eléctrico" },
-    { api: "psychic", nombre: "Psíquico" },
-    { api: "ice", nombre: "Hielo" },
-    { api: "dragon", nombre: "Dragón" },
-    { api: "dark", nombre: "Siniestro" },
-    { api: "fairy", nombre: "Hada" },
+  { value: "normal", label: "Normal" },
+  { value: "fighting", label: "Lucha" },
+  { value: "flying", label: "Volador" },
+  { value: "poison", label: "Veneno" },
+  { value: "ground", label: "Tierra" },
+  { value: "rock", label: "Roca" },
+  { value: "bug", label: "Bicho" },
+  { value: "ghost", label: "Fantasma" },
+  { value: "steel", label: "Acero" },
+  { value: "fire", label: "Fuego" },
+  { value: "water", label: "Agua" },
+  { value: "grass", label: "Planta" },
+  { value: "electric", label: "Eléctrico" },
+  { value: "psychic", label: "Psíquico" },
+  { value: "ice", label: "Hielo" },
+  { value: "dragon", label: "Dragón" },
+  { value: "dark", label: "Siniestro" },
+  { value: "fairy", label: "Hada" },
 ];
 
 export default function Navigation({
-    children,
-    onSelectGeneration,
-    onSelectType,
-    onPokedex,
-    onShowFavorites,
-    onShowItems,
-    onSearch,
-    searchQuery = "",
-    selectedTypes = [],
+  activeView,
+  children,
+  onOpenFilters,
+  onShowPokedex,
+  onToggleGeneration,
+  onToggleType,
+  onToggleFavorites,
+  onShowItems,
+  onSearch,
+  searchQuery = "",
+  selectedGeneration = null,
+  selectedTypes = [],
+  favoritesOnly = false,
+  favoritesReady = true,
 }) {
-    const [modalActivo, setModalActivo] = useState(null);
-    const [tiposSeleccionados, setTiposSeleccionados] = useState([]);
-    const [buscando, setBuscando] = useState(false);
+  const [listaAbierta, setListaAbierta] = useState(null);
+  const [buscando, setBuscando] = useState(false);
+  const generation = GENERACIONES.find(
+    (item) => item.value === selectedGeneration,
+  );
 
-    const cerrar = () => setModalActivo(null);
+  const alternarLista = (lista) => {
+    if (listaAbierta === lista) {
+      setListaAbierta(null);
+      return;
+    }
 
-    const abrirTipos = () => {
-        setTiposSeleccionados(selectedTypes);
-        setModalActivo("tipo");
-    };
+    onOpenFilters();
+    setBuscando(false);
+    setListaAbierta(lista);
+  };
 
-    const alternarBusqueda = () => {
-        if (buscando) onSearch?.(""); // al cerrar, se limpia la búsqueda
-        setBuscando(!buscando);
-    };
+  const alternarBusqueda = () => {
+    if (buscando) onSearch("");
+    setBuscando(!buscando);
+    setListaAbierta(null);
+  };
 
-    const elegirGeneracion = (gen) => {
-        cerrar();
-        if (onSelectGeneration) onSelectGeneration(gen.id);
-    };
+  const mostrarPokedex = () => {
+    setListaAbierta(null);
+    setBuscando(false);
+    onShowPokedex();
+  };
 
-    const elegirTipos = () => {
-        cerrar();
-        if (onSelectType) onSelectType(tiposSeleccionados);
-    };
+  const mostrarObjetos = () => {
+    setListaAbierta(null);
+    setBuscando(false);
+    onShowItems();
+  };
 
-    const alternarTipo = (tipo) => {
-        setTiposSeleccionados((seleccionados) =>
-            seleccionados.includes(tipo)
-                ? seleccionados.filter((seleccionado) => seleccionado !== tipo)
-                : [...seleccionados, tipo],
-        );
-    };
+  return (
+    <SafeAreaView style={styles.navigationContainer}>
+      <View style={styles.appHeader} accessibilityRole="header">
+        <Image
+          source={require("./assets/app-icon-square.png")}
+          style={styles.appLogo}
+          contentFit="contain"
+          accessibilityLabel="Logo de Poké Ball"
+        />
+        <Text style={styles.appTitle}>Pokédex</Text>
+      </View>
 
-    return (
-        <SafeAreaView style={{ flex: 1 }}>
-            <View style={styles.appHeader} accessibilityRole="header">
-                <Image
-                    source={require("./assets/app-icon-square.png")}
-                    style={styles.appLogo}
-                    contentFit="contain"
-                    accessibilityLabel="Logo de Poké Ball"
-                />
-                <Text style={styles.appTitle}>Pokédex</Text>
-            </View>
+      <View style={styles.sectionTabs}>
+        <Button
+          mode={activeView === "pokedex" ? "contained" : "outlined"}
+          buttonColor={
+            activeView === "pokedex"
+              ? colors.selectedControl
+              : colors.sectionTabBackground
+          }
+          textColor={
+            activeView === "pokedex" ? colors.white : colors.inactiveText
+          }
+          style={styles.sectionTabButton}
+          onPress={mostrarPokedex}
+        >
+          Pokédex
+        </Button>
+        <Button
+          mode={activeView === "items" ? "contained" : "outlined"}
+          buttonColor={
+            activeView === "items"
+              ? colors.selectedControl
+              : colors.sectionTabBackground
+          }
+          textColor={activeView === "items" ? colors.white : colors.inactiveText}
+          style={styles.sectionTabButton}
+          onPress={mostrarObjetos}
+        >
+          Objetos
+        </Button>
+      </View>
 
-            <Appbar style={styles.navBar}>
-                <Button
-                    mode="contained-tonal"
-                    buttonColor="#E3EEFA"
-                    textColor="#1F3A5F"
-                    compact
-                    onPress={onPokedex}
-                >
-                    Pokedex
-                </Button>
-                <Button
-                    mode="contained-tonal"
-                    buttonColor="#E3EEFA"
-                    textColor="#1F3A5F"
-                    compact
-                    onPress={() => setModalActivo("generacion")}
-                >
-                    Generación
-                </Button>
-                <Button
-                    mode="contained-tonal"
-                    buttonColor="#E3EEFA"
-                    textColor="#1F3A5F"
-                    compact
-                    onPress={abrirTipos}
-                >
-                    Tipo
-                </Button>
-                <Appbar.Action
-                    icon={buscando ? "close" : "magnify"}
-                    onPress={alternarBusqueda}
-                    accessibilityLabel={
-                        buscando ? "Cerrar búsqueda" : "Buscar pokémon"
-                    }
-                />
-            </Appbar>
-
-            {buscando ? (
-                <Searchbar
-                    placeholder="Nombre o número"
-                    value={searchQuery}
-                    onChangeText={(texto) => onSearch?.(texto)}
-                    autoFocus
-                    style={{ margin: 8 }}
-                />
-            ) : null}
-
-            <View style={{ flex: 1 }}>{children}</View>
-
-            <Appbar style={styles.bottomBar}>
-                <Appbar.Action
-                    icon="cog-outline"
-                    accessibilityLabel="Opciones"
-                    onPress={() => setModalActivo("opciones")}
-                />
-            </Appbar>
-
-            <Modal
-                visible={modalActivo === "opciones"}
-                onDismiss={cerrar}
-                contentContainerStyle={{ marginHorizontal: 24 }}
+      {activeView === "pokedex" ? (
+        <>
+          <Appbar style={styles.navBar}>
+            <Button
+              mode={generation ? "contained" : "contained-tonal"}
+              buttonColor={
+                generation ? colors.selectedControl : colors.inactiveControl
+              }
+              textColor={generation ? colors.white : colors.inactiveText}
+              compact
+              onPress={() => alternarLista("generacion")}
             >
-                <Card>
-                    <Card.Title title="Opciones" />
-                    <Card.Content style={{ gap: 8 }}>
-                        <Button
-                            mode="outlined"
-                            icon="star-outline"
-                            onPress={() => {
-                                cerrar();
-                                onShowFavorites?.();
-                            }}
-                        >
-                            Favoritos
-                        </Button>
-                        <Button
-                            mode="outlined"
-                            icon="bag-personal-outline"
-                            onPress={() => {
-                                cerrar();
-                                onShowItems?.();
-                            }}
-                        >
-                            Objetos
-                        </Button>
-                    </Card.Content>
-                    <Card.Actions>
-                        <Button onPress={cerrar}>Cerrar</Button>
-                    </Card.Actions>
-                </Card>
-            </Modal>
-
-            <Modal
-                visible={modalActivo === "generacion"}
-                onDismiss={cerrar}
-                contentContainerStyle={{ marginHorizontal: 24 }}
+              {generation ? generation.shortName : "Generación"}
+            </Button>
+            <Button
+              mode={
+                selectedTypes.length > 0 ? "contained" : "contained-tonal"
+              }
+              buttonColor={
+                selectedTypes.length > 0
+                  ? colors.selectedControl
+                  : colors.inactiveControl
+              }
+              textColor={
+                selectedTypes.length > 0 ? colors.white : colors.inactiveText
+              }
+              compact
+              onPress={() => alternarLista("tipo")}
             >
-                <Card>
-                    <Card.Title title="Elige una generación" />
-                    <Card.Content>
-                        <ScrollView
-                            style={{ maxHeight: 400 }}
-                            contentContainerStyle={{ gap: 8 }}
-                        >
-                            {GENERACIONES.map((gen) => (
-                                <Button
-                                    key={gen.id}
-                                    mode="outlined"
-                                    onPress={() => elegirGeneracion(gen)}
-                                >
-                                    {gen.nombre} · {gen.region}
-                                </Button>
-                            ))}
-                        </ScrollView>
-                    </Card.Content>
-                    <Card.Actions>
-                        <Button onPress={cerrar}>Cancelar</Button>
-                    </Card.Actions>
-                </Card>
-            </Modal>
-
-            <Modal
-                visible={modalActivo === "tipo"}
-                onDismiss={cerrar}
-                contentContainerStyle={{ marginHorizontal: 24 }}
+              {selectedTypes.length > 0
+                ? `Tipo (${selectedTypes.length})`
+                : "Tipo"}
+            </Button>
+            <Button
+              mode={favoritesOnly ? "contained" : "contained-tonal"}
+              buttonColor={
+                favoritesOnly ? colors.selectedControl : colors.inactiveControl
+              }
+              textColor={favoritesOnly ? colors.white : colors.inactiveText}
+              icon={favoritesOnly ? "star" : "star-outline"}
+              compact
+              disabled={!favoritesReady}
+              onPress={() => {
+                setListaAbierta(null);
+                setBuscando(false);
+                onToggleFavorites();
+              }}
             >
-                <Card>
-                    <Card.Title
-                        title="Elige uno o más tipos"
-                        subtitle={`${tiposSeleccionados.length} seleccionados`}
-                    />
-                    <Card.Content>
-                        <ScrollView style={{ maxHeight: 400 }}>
-                            <View
-                                style={{
-                                    flexDirection: "row",
-                                    flexWrap: "wrap",
-                                    gap: 8,
-                                }}
-                            >
-                                {TIPOS.map((tipo) => (
-                                    <Button
-                                        key={tipo.api}
-                                        mode={
-                                            tiposSeleccionados.includes(tipo.api)
-                                                ? "contained"
-                                                : "outlined"
-                                        }
-                                        style={{ width: "48%" }}
-                                        onPress={() => alternarTipo(tipo.api)}
-                                    >
-                                        {tipo.nombre}
-                                    </Button>
-                                ))}
-                            </View>
-                        </ScrollView>
-                    </Card.Content>
-                    <Card.Actions>
-                        <Button onPress={cerrar}>Cancelar</Button>
-                        <Button onPress={elegirTipos}>Aplicar</Button>
-                    </Card.Actions>
-                </Card>
-            </Modal>
-        </SafeAreaView>
-    );
+              Favoritos
+            </Button>
+            <Appbar.Action
+              icon={buscando ? "close" : "magnify"}
+              onPress={alternarBusqueda}
+              accessibilityLabel={
+                buscando ? "Cerrar búsqueda" : "Buscar pokémon"
+              }
+            />
+          </Appbar>
+
+          {listaAbierta === "generacion" ? (
+            <ListaDespegable
+              title="Elige una generación"
+              options={GENERACIONES}
+              selectedValues={generation ? [generation.value] : []}
+              onToggle={onToggleGeneration}
+              onClose={() => setListaAbierta(null)}
+              closeOnSelect
+            />
+          ) : null}
+
+          {listaAbierta === "tipo" ? (
+            <ListaDespegable
+              title="Elige uno o más tipos"
+              options={TIPOS}
+              selectedValues={selectedTypes}
+              onToggle={onToggleType}
+              onClose={() => setListaAbierta(null)}
+            />
+          ) : null}
+
+          {buscando ? (
+            <Searchbar
+              placeholder="Nombre o número"
+              value={searchQuery}
+              onChangeText={onSearch}
+              autoFocus
+              style={styles.navigationSearch}
+            />
+          ) : null}
+        </>
+      ) : null}
+
+      <View style={styles.navigationContent}>{children}</View>
+    </SafeAreaView>
+  );
 }

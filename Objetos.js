@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   ScrollView,
   SectionList,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -11,6 +10,7 @@ import { Button, Card, Chip } from "react-native-paper";
 import { Image } from "expo-image";
 import OfflineMessage from "./OfflineMessage";
 import useNetworkRetry, { isNetworkError } from "./useNetworkRetry";
+import styles from "./styles";
 
 const API_URL = "https://pokeapi.co/api/v2";
 const SPRITES_URL =
@@ -219,17 +219,17 @@ export default function Objetos() {
   const secciones = datos[activo];
 
   const renderItem = ({ item }) => (
-    <Card style={estilos.tarjeta}>
-      <Card.Content style={estilos.fila}>
-        <View style={estilos.info}>
-          <Text style={estilos.nombre}>{formatear(item.name)}</Text>
-          <Text style={estilos.numero}>
+    <Card style={styles.itemCard}>
+      <Card.Content style={styles.itemRow}>
+        <View style={styles.itemInfo}>
+          <Text style={styles.itemName}>{formatear(item.name)}</Text>
+          <Text style={styles.itemNumber}>
             #{String(item.id).padStart(4, "0")}
           </Text>
         </View>
         <Image
           source={{ uri: item.image }}
-          style={estilos.imagen}
+          style={styles.itemImage}
           contentFit="contain"
           accessibilityLabel={`Imagen de ${formatear(item.name)}`}
         />
@@ -238,12 +238,12 @@ export default function Objetos() {
   );
 
   return (
-    <View style={estilos.contenedor}>
+    <View style={styles.itemContainer}>
       <View>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={estilos.chips}
+          contentContainerStyle={styles.itemPockets}
         >
           {BOLSILLOS.map((bolsillo) => (
             <Chip
@@ -261,7 +261,7 @@ export default function Objetos() {
       {isOffline || isNetworkError(error) ? (
         <OfflineMessage />
       ) : error ? (
-        <View style={estilos.centro}>
+        <View style={styles.itemCenter}>
           <Text accessibilityRole="alert">{error}</Text>
           <Button
             onPress={() => {
@@ -273,7 +273,7 @@ export default function Objetos() {
           </Button>
         </View>
       ) : !secciones ? (
-        <View style={estilos.centro}>
+        <View style={styles.itemCenter}>
           <ActivityIndicator accessibilityLabel="Cargando objetos" />
         </View>
       ) : (
@@ -282,44 +282,20 @@ export default function Objetos() {
           keyExtractor={(item) => item.key}
           renderItem={renderItem}
           renderSectionHeader={({ section }) => (
-            <Text style={estilos.encabezado}>
+            <Text style={styles.itemSectionHeader}>
               {section.title} ({section.data.length})
             </Text>
           )}
           stickySectionHeadersEnabled
           initialNumToRender={20}
-          contentContainerStyle={estilos.lista}
+          contentContainerStyle={styles.itemList}
           ListEmptyComponent={
-            <Text style={estilos.vacio}>No hay objetos en este bolsillo</Text>
+            <Text style={styles.itemEmpty}>
+              No hay objetos en este bolsillo
+            </Text>
           }
         />
       )}
     </View>
   );
 }
-
-const estilos = StyleSheet.create({
-  contenedor: { flex: 1 },
-  chips: { flexDirection: "row", gap: 8, padding: 12 },
-  lista: { paddingHorizontal: 12, paddingBottom: 12, gap: 8 },
-  encabezado: {
-    fontSize: 16,
-    fontWeight: "bold",
-    textTransform: "capitalize",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    backgroundColor: "#FFFFFF",
-  },
-  tarjeta: { backgroundColor: "#F5F0F8" },
-  fila: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  info: { flex: 1 },
-  nombre: { fontSize: 16, fontWeight: "bold", textTransform: "capitalize" },
-  numero: { opacity: 0.6, marginTop: 2 },
-  imagen: { width: 56, height: 56 },
-  centro: { flex: 1, alignItems: "center", justifyContent: "center" },
-  vacio: { textAlign: "center", marginTop: 24 },
-});

@@ -12,8 +12,10 @@ const EMPTY_POKEMON_IMAGE_URL =
 
 export default function MainContent({
   activeView,
+  canShowOfflineFavorites,
   error,
   favorites,
+  favoritesOnly,
   favoritesReady,
   isOffline,
   listRef,
@@ -30,11 +32,9 @@ export default function MainContent({
   searching,
   selectedPokemon,
 }) {
-  const displayedPokemon =
-    activeView === "favorites" ? favorites : pokemonData;
   const isSearching =
     activeView !== "items" && searchQuery.trim().length > 0;
-  const listData = isSearching ? searchResults : displayedPokemon;
+  const listData = isSearching ? searchResults : pokemonData;
 
   const renderPokemonCard = ({ item }) => (
     <PokemonCard
@@ -61,11 +61,11 @@ export default function MainContent({
       );
     }
 
-    if (activeView === "favorites") {
+    if (favoritesOnly) {
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>
-            Aún no tienes pokémones favoritos
+            No hay favoritos que coincidan con los filtros
           </Text>
         </View>
       );
@@ -86,12 +86,12 @@ export default function MainContent({
 
   if (activeView === "items") return <Objetos />;
 
-  if (activeView === "pokedex" && (isOffline || isNetworkError(error))) {
+  if (
+    activeView === "pokedex" &&
+    (isOffline || isNetworkError(error)) &&
+    !(canShowOfflineFavorites && !isSearching)
+  ) {
     return <OfflineMessage />;
-  }
-
-  if (!isSearching && activeView === "favorites" && !favoritesReady) {
-    return <ActivityIndicator accessibilityLabel="Cargando favoritos" />;
   }
 
   if (!isSearching && activeView === "pokedex" && loading) {
@@ -104,7 +104,12 @@ export default function MainContent({
 
   return (
     <>
-      <View style={{ flex: 1, display: selectedPokemon ? "none" : "flex" }}>
+      <View
+        style={[
+          styles.mainContent,
+          selectedPokemon && styles.hiddenContent,
+        ]}
+      >
         <FlatList
           ref={listRef}
           data={listData}
@@ -117,10 +122,8 @@ export default function MainContent({
               <Text style={styles.favoriteListTitle}>
                 Resultados para &quot;{searchQuery.trim()}&quot;
               </Text>
-            ) : activeView === "favorites" ? (
-              <Text style={styles.favoriteListTitle}>
-                Pokémones favoritos
-              </Text>
+            ) : favoritesOnly ? (
+              <Text style={styles.favoriteListTitle}>Pokémones favoritos</Text>
             ) : null
           }
           onEndReached={
@@ -132,7 +135,7 @@ export default function MainContent({
           ListFooterComponent={
             !isSearching && activeView === "pokedex" && loadingMore ? (
               <ActivityIndicator
-                style={{ marginVertical: 16 }}
+                style={styles.loadingMore}
                 accessibilityLabel="Cargando más Pokémon"
               />
             ) : null

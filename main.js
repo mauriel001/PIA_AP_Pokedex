@@ -11,13 +11,19 @@ import useNetworkRetry from "./useNetworkRetry";
 
 export default function Main() {
   const { isOffline, retryKey } = useNetworkRetry();
-  const [filter, setFilter] = useState({ kind: "all" });
+  const [filters, setFilters] = useState({
+    generation: null,
+    types: [],
+    favoritesOnly: false,
+  });
   const [selectedPokemon, setSelectedPokemon] = useState(null);
   const [activeView, setActiveView] = useState("pokedex");
   const cryPlayer = useAudioPlayer(null);
   const listRef = useRef(null);
   const scrollOffsetRef = useRef(0);
 
+  const { favorites, favoritesReady, toggleFavorite } = useFavorites();
+  const favoritesForFilter = filters.favoritesOnly ? favorites : null;
   const {
     error,
     loading,
@@ -25,8 +31,7 @@ export default function Main() {
     loadMore,
     pokemonData,
     setError,
-  } = usePokemonCatalog(filter, retryKey);
-  const { favorites, favoritesReady, toggleFavorite } = useFavorites();
+  } = usePokemonCatalog(filters, favoritesForFilter, retryKey);
   const {
     searchQuery,
     setSearchQuery,
@@ -67,25 +72,46 @@ export default function Main() {
     }
   };
 
-  // Limpia la búsqueda y el detalle al cambiar de sección o filtro.
-  const resetView = (view, nextFilter) => {
+  const preparePokedex = () => {
     setSearchQuery("");
     scrollOffsetRef.current = 0;
     setSelectedPokemon(null);
-    setActiveView(view);
-    if (nextFilter) setFilter(nextFilter);
+    setActiveView("pokedex");
   };
 
-  const showPokedex = () => resetView("pokedex", { kind: "all" });
-  const showGeneration = (generationId) =>
-    resetView("pokedex", { kind: "generation", value: generationId });
-  const showTypes = (types) =>
-    resetView(
-      "pokedex",
-      types.length > 0 ? { kind: "type", values: types } : { kind: "all" },
-    );
-  const showFavorites = () => resetView("favorites");
-  const showItems = () => resetView("items");
+  const toggleGeneration = (generation) => {
+    preparePokedex();
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      generation:
+        currentFilters.generation === generation ? null : generation,
+    }));
+  };
+
+  const toggleType = (type) => {
+    preparePokedex();
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      types: currentFilters.types.includes(type)
+        ? currentFilters.types.filter((selectedType) => selectedType !== type)
+        : [...currentFilters.types, type],
+    }));
+  };
+
+  const toggleFavoritesFilter = () => {
+    preparePokedex();
+    setFilters((currentFilters) => ({
+      ...currentFilters,
+      favoritesOnly: !currentFilters.favoritesOnly,
+    }));
+  };
+
+  const showItems = () => {
+    setSearchQuery("");
+    scrollOffsetRef.current = 0;
+    setSelectedPokemon(null);
+    setActiveView("items");
+  };
 
   const handleSearch = (text) => {
     scrollOffsetRef.current = 0;
@@ -101,38 +127,41 @@ export default function Main() {
   return (
     <SafeAreaProvider>
       <Navigation
-        // Funciones de acción:
-        onPokedex={showPokedex}             // Vuelve a la Pokédex completa
-        onShowFavorites={showFavorites}     // Muestra favoritos
-        onShowItems={showItems}             // Muestra objetos
-        onSelectGeneration={showGeneration} // Aplica el filtro de generación elegida
-        onSelectType={showTypes}            // Aplica los tipos elegidos
-        onSearch={handleSearch}             // Actualiza o limpia el texto de búsqueda
-        // Datos o estados:
-        searchQuery={searchQuery}                                   // Texto actual de búsqueda
-        selectedTypes={filter.kind === "type" ? filter.values : []} // Tipos seleccionados actualmente
+        activeView={activeView}
+        onOpenFilters={preparePokedex}
+        onShowPokedex={preparePokedex}
+        onToggleGeneration={toggleGeneration}
+        onToggleType={toggleType}
+        onToggleFavorites={toggleFavoritesFilter}
+        onShowItems={showItems}
+        onSearch={handleSearch}
+        searchQuery={searchQuery}
+        selectedGeneration={filters.generation}
+        selectedTypes={filters.types}
+        favoritesOnly={filters.favoritesOnly}
+        favoritesReady={favoritesReady}
       >
         <MainContent
-          // Funciones de acción:
-          onLoadMore={loadMore}                   // Carga la siguiente página
-          onPokemonPress={handlePokemonPress}     // Abre el detalle del pokémon y reproduce el sonido del pokémon
-          onScroll={handleListScroll}             // Guarda la posición de desplazamiento
-          onToggleFavorite={toggleFavorite}       // Agrega/quita un favorito
-          onBack={() => setSelectedPokemon(null)} // Cierra el detalle
-          // Datos o estados:
-          activeView={activeView}                 // Sección activa (Pokédex/Favoritos/Ítems)
-          error={error}                           // Error actual de carga o búsqueda
-          favorites={favorites}                   // Lista de pokémones favoritos
-          favoritesReady={favoritesReady}         // Indica si ya terminó de cargar favoritos
-          isOffline={isOffline}                   // Indica si el dispositivo no tiene conexión
-          listRef={listRef}                       // Referencia a la lista, usada para restaurar el desplazamiento
-          loading={loading}                       // Indica la carga inicial de la Pokédex
-          loadingMore={loadingMore}               // Indica que se está cargando otra página
-          pokemonData={pokemonData}               // Pokémones cargados para la Pokédex
-          searchQuery={searchQuery}               // Texto de búsqueda actual
-          searchResults={searchResults}           // Resultados de búsqueda
-          searching={searching}                   // Indica que la búsqueda está en curso
-          selectedPokemon={selectedPokemon}       // Pokémon cuyo detalle está abierto (null si no hay detalle seleccionado)
+          activeView={activeView}
+          error={error}
+          favorites={favorites}
+          favoritesOnly={filters.favoritesOnly}
+          favoritesReady={favoritesReady}
+          canShowOfflineFavorites={filters.favoritesOnly && filters.generation === null}
+          isOffline={isOffline}
+          listRef={listRef}
+          loading={loading}
+          loadingMore={loadingMore}
+          onLoadMore={loadMore}
+          onPokemonPress={handlePokemonPress}
+          onScroll={handleListScroll}
+          onToggleFavorite={toggleFavorite}
+          onBack={() => setSelectedPokemon(null)}
+          pokemonData={pokemonData}
+          searchQuery={searchQuery}
+          searchResults={searchResults}
+          searching={searching}
+          selectedPokemon={selectedPokemon}
         />
       </Navigation>
     </SafeAreaProvider>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getEntries, getPokemonPage } from "../services/pokemonApi";
 import { isNetworkError } from "../useNetworkRetry";
 
-export default function usePokemonCatalog(filter, retryKey) {
+export default function usePokemonCatalog(filter, favorites, retryKey) {
   const [entries, setEntries] = useState([]);
   const [pokemonData, setPokemonData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,9 +25,27 @@ export default function usePokemonCatalog(filter, retryKey) {
     setLoadingMore(false);
     loadingMoreRef.current = false;
 
+    // Los favoritos guardados ya tienen sus datos y se pueden filtrar localmente.
+    if (filter.favoritesOnly && filter.generation === null) {
+      const selectedFavorites = favorites.filter((pokemon) =>
+        filter.types.every((type) => pokemon.types.includes(type)),
+      );
+      setEntries([]);
+      setPokemonData(selectedFavorites);
+      setLoading(false);
+      return () => {
+        isActive = false;
+        controller.abort();
+      };
+    }
+
     (async () => {
       try {
-        const allEntries = await getEntries(filter, controller.signal);
+        const allEntries = await getEntries(
+          filter,
+          favorites,
+          controller.signal,
+        );
         const firstPage = await getPokemonPage(
           allEntries,
           0,
@@ -47,7 +65,7 @@ export default function usePokemonCatalog(filter, retryKey) {
       isActive = false;
       controller.abort();
     };
-  }, [filter, retryKey]);
+  }, [filter, favorites, retryKey]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Añade la siguiente página al acercarse al final de la lista.
