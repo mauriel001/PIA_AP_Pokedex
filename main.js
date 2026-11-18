@@ -1,4 +1,4 @@
-import { BackHandler } from "react-native";
+import { ActivityIndicator, BackHandler, View } from "react-native";
 import { useAudioPlayer } from "expo-audio";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useEffect, useRef, useState } from "react";
@@ -8,8 +8,11 @@ import useFavorites from "./hooks/useFavorites";
 import usePokemonCatalog from "./hooks/usePokemonCatalog";
 import usePokemonSearch from "./hooks/usePokemonSearch";
 import useNetworkRetry from "./useNetworkRetry";
+import Login from "./Login";
+import { obtenerSesion, cerrarSesion } from "./auth";
 
-export default function Main() {
+// Pantalla principal (solo se monta cuando ya hay sesión iniciada)
+function Pokedex({ usuario, onLogout }) {
   const { isOffline, retryKey } = useNetworkRetry();
   const [filters, setFilters] = useState({
     generation: null,
@@ -127,6 +130,8 @@ export default function Main() {
   return (
     <SafeAreaProvider>
       <Navigation
+        usuario={usuario}
+        onLogout={onLogout}
         activeView={activeView}
         onOpenFilters={preparePokedex}
         onShowPokedex={preparePokedex}
@@ -147,7 +152,9 @@ export default function Main() {
           favorites={favorites}
           favoritesOnly={filters.favoritesOnly}
           favoritesReady={favoritesReady}
-          canShowOfflineFavorites={filters.favoritesOnly && filters.generation === null}
+          canShowOfflineFavorites={
+            filters.favoritesOnly && filters.generation === null
+          }
           isOffline={isOffline}
           listRef={listRef}
           loading={loading}
@@ -166,4 +173,48 @@ export default function Main() {
       </Navigation>
     </SafeAreaProvider>
   );
+}
+
+// Punto de entrada: decide si mostrar el login o la Pokédex
+export default function Main() {
+  const [usuario, setUsuario] = useState(null);
+  const [cargandoSesion, setCargandoSesion] = useState(true);
+
+  useEffect(() => {
+    let isActive = true;
+    obtenerSesion()
+      .then((sesion) => {
+        if (isActive) setUsuario(sesion);
+      })
+      .catch((error) => console.warn("No se pudo leer la sesión:", error))
+      .finally(() => {
+        if (isActive) setCargandoSesion(false);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    await cerrarSesion();
+    setUsuario(null);
+  };
+
+  if (cargandoSesion) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center" }}>
+        <ActivityIndicator accessibilityLabel="Cargando sesión" />
+      </View>
+    );
+  }
+
+  if (!usuario) {
+    return (
+      <SafeAreaProvider>
+        <Login onLogin={setUsuario} />
+      </SafeAreaProvider>
+    );
+  }
+
+  return <Pokedex usuario={usuario} onLogout={handleLogout} />;
 }

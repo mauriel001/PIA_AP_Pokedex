@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { Card, IconButton } from "react-native-paper";
 import { Image } from "expo-image";
-import OfflineMessage from "./OfflineMessage";
-import useNetworkRetry, { isNetworkError } from "./useNetworkRetry";
 
 const API_URL = "https://pokeapi.co/api/v2";
 
@@ -20,6 +18,15 @@ function clasificar(nombre) {
   return null;
 }
 
+// Imagen normal y shiny de la respuesta de /pokemon/{id}
+function obtenerImagenes(data) {
+  const arte = data.sprites.other?.["official-artwork"];
+  return {
+    imagen: arte?.front_default ?? data.sprites.front_default,
+    imagenShiny: arte?.front_shiny ?? data.sprites.front_shiny,
+  };
+}
+
 async function fetchJson(url, signal) {
   const response = await fetch(url, { signal });
   if (!response.ok) {
@@ -29,9 +36,8 @@ async function fetchJson(url, signal) {
 }
 
 export default function Alternativas({ pokemon, tiposEs = {} }) {
-  const { isOffline, retryKey } = useNetworkRetry();
   const [formas, setFormas] = useState([]);
-  const [error, setError] = useState(null);
+  const [shinyPrincipal, setShinyPrincipal] = useState(null);
   const [ancho, setAncho] = useState(0);
   const [indice, setIndice] = useState(0);
   const listaRef = useRef(null);
@@ -40,15 +46,23 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
     const controller = new AbortController();
     let isActive = true;
     setFormas([]);
+    setShinyPrincipal(null);
     setIndice(0);
-    setError(null);
 
     (async () => {
       try {
-        const species = await fetchJson(
-          `${API_URL}/pokemon-species/${pokemon.id}/`,
-          controller.signal,
-        );
+        // Shiny del principal y lista de variedades, en paralelo
+        const [principal, species] = await Promise.all([
+          fetchJson(`${API_URL}/pokemon/${pokemon.id}/`, controller.signal),
+          fetchJson(
+            `${API_URL}/pokemon-species/${pokemon.id}/`,
+            controller.signal,
+          ),
+        ]);
+
+        if (isActive) {
+          setShinyPrincipal(obtenerImagenes(principal).imagenShiny ?? null);
+        }
 
         const candidatas = species.varieties
           .filter(({ is_default }) => !is_default)
@@ -62,13 +76,10 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
         const detalles = await Promise.all(
           candidatas.map(async (forma) => {
             const data = await fetchJson(forma.url, controller.signal);
-            const imagen =
-              data.sprites.other?.["official-artwork"]?.front_default ??
-              data.sprites.front_default;
             return {
               nombre: forma.nombre,
               etiqueta: forma.etiqueta,
-              imagen,
+              ...obtenerImagenes(data),
               types: data.types.map(({ type }) => type.name),
             };
           }),
@@ -76,10 +87,7 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
 
         if (isActive) setFormas(detalles);
       } catch (error) {
-        if (error.name !== "AbortError") {
-          console.warn(error.message);
-          if (isActive && isNetworkError(error)) setError(error.message);
-        }
+        if (error.name !== "AbortError") console.warn(error.message);
       }
     })();
 
@@ -87,12 +95,14 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
       isActive = false;
       controller.abort();
     };
-  }, [pokemon.id, retryKey]);
+  }, [pokemon.id]);
 
-  const paginas = [
+  // Cada forma genera una página normal y, si existe, una página shiny
+  const base = [
     {
       clave: "principal",
       imagen: pokemon.image,
+      imagenShiny: shinyPrincipal,
       titulo: `#${String(pokemon.id).padStart(3, "0")} ${pokemon.name}`,
       subtitulo: null,
       types: pokemon.types,
@@ -100,15 +110,28 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
     ...formas.map((forma) => ({
       clave: forma.nombre,
       imagen: forma.imagen,
+      imagenShiny: forma.imagenShiny,
       titulo: forma.etiqueta,
       subtitulo: forma.nombre.replace(/-/g, " "),
       types: forma.types,
     })),
   ];
 
-  const hayFormas = formas.length > 0;
+  const paginas = base.flatMap((forma) => {
+    const normal = { ...forma, shiny: false };
+    if (!forma.imagenShiny) return [normal];
+    return [
+      normal,
+      {
+        ...forma,
+        clave: `${forma.clave}-shiny`,
+        imagen: forma.imagenShiny,
+        shiny: true,
+      },
+    ];
+  });
 
-  if (isOffline || isNetworkError(error)) return <OfflineMessage />;
+  const hayVarias = paginas.length > 1;
 
   const irA = (nuevo) => {
     const destino = Math.max(0, Math.min(paginas.length - 1, nuevo));
@@ -126,7 +149,7 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
           source={{ uri: pagina.imagen }}
           style={estilos.imagen}
           contentFit="contain"
-          accessibilityLabel={`Imagen de ${pagina.titulo}`}
+          accessibilityLabel={`${pagina.shiny ? "Versión shiny: " : ""}${pagina.titulo}`}
         />
       ) : (
         <View style={[estilos.imagen, estilos.sinImagen]}>
@@ -137,6 +160,7 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
       {pagina.subtitulo ? (
         <Text style={estilos.subtitulo}>{pagina.subtitulo}</Text>
       ) : null}
+      {pagina.shiny ? <Text style={estilos.shiny}>✨ Shiny</Text> : null}
       <View style={estilos.tipos}>
         {pagina.types.map((type) => (
           <Text key={type} style={estilos.tipo}>
@@ -151,7 +175,7 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
     <Card>
       <Card.Content>
         <View onLayout={(e) => setAncho(e.nativeEvent.layout.width)}>
-          {hayFormas && ancho > 0 ? (
+          {hayVarias && ancho > 0 ? (
             <>
               <FlatList
                 ref={listaRef}
@@ -225,6 +249,16 @@ const estilos = StyleSheet.create({
     opacity: 0.7,
     textTransform: "capitalize",
     textAlign: "center",
+  },
+  shiny: {
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: "#FFF3C4",
+    color: "#7A5C00",
+    fontWeight: "bold",
+    overflow: "hidden",
   },
   tipos: { flexDirection: "row", gap: 8, marginTop: 8 },
   tipo: {

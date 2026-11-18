@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { Image } from "expo-image";
-import { Appbar, Button, Searchbar } from "react-native-paper";
+import { Appbar, Button, IconButton, Searchbar } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import ListaDespegable from "./ListaDespegable";
 import styles, { colors } from "./styles";
@@ -42,6 +42,8 @@ const TIPOS = [
 export default function Navigation({
   activeView,
   children,
+  usuario,
+  onLogout,
   onOpenFilters,
   onShowPokedex,
   onToggleGeneration,
@@ -100,6 +102,30 @@ export default function Navigation({
           accessibilityLabel="Logo de Poké Ball"
         />
         <Text style={styles.appTitle}>Pokédex</Text>
+
+        {usuario ? (
+          <View
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "flex-end",
+            }}
+          >
+            <Text
+              numberOfLines={1}
+              style={{ flexShrink: 1, opacity: 0.7, fontSize: 13 }}
+            >
+              {usuario.nombre}
+            </Text>
+            <IconButton
+              icon="logout"
+              size={22}
+              onPress={onLogout}
+              accessibilityLabel={`Cerrar sesión de ${usuario.nombre}`}
+            />
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.sectionTabs}>

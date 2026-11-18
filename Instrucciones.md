@@ -61,3 +61,4 @@ Se agregará los poderes, movimientos y características de cada pokemon
 
 puse esta extencion
 npx expo install @expo/vector-icons
+npx expo install expo-crypto
