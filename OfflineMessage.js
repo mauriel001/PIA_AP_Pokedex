@@ -2,17 +2,13 @@ import { Image } from "expo-image";
 import { Text, View } from "react-native";
 import styles from "./styles";
 
-export const OFFLINE_POKEMON_IMAGE_URL =
-  "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/54.png";
-
 export default function OfflineMessage() {
   return (
     <View style={styles.offlineState}>
       <Image
-        source={{ uri: OFFLINE_POKEMON_IMAGE_URL }}
+        source={require("./assets/psyduck.png")}
         style={styles.offlineImage}
         contentFit="contain"
-        cachePolicy="disk"
         accessibilityLabel="Psyduck confundido porque no hay conexión"
       />
       <Text accessibilityRole="alert" style={styles.offlineTitle}>
