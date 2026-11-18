@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { View, ScrollView } from "react-native";
+import { Text, View, ScrollView } from "react-native";
+import { Image } from "expo-image";
 import {
     Appbar,
     Modal,
@@ -90,6 +91,16 @@ export default function Navigation({
 
     return (
         <SafeAreaView style={{ flex: 1 }}>
+            <View style={styles.appHeader} accessibilityRole="header">
+                <Image
+                    source={require("./assets/app-icon-square.png")}
+                    style={styles.appLogo}
+                    contentFit="contain"
+                    accessibilityLabel="Logo de Poké Ball"
+                />
+                <Text style={styles.appTitle}>Pokédex</Text>
+            </View>
+
             <Appbar style={styles.navBar}>
                 <Button
                     mode="contained-tonal"

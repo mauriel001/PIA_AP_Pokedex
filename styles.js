@@ -1,6 +1,24 @@
 import { StyleSheet } from "react-native";
 
 export default StyleSheet.create({
+    appHeader: {
+        alignItems: "center",
+        backgroundColor: "#D32F2F",
+        flexDirection: "row",
+        gap: 10,
+        height: 64,
+        justifyContent: "center",
+    },
+    appLogo: {
+        borderRadius: 22,
+        height: 44,
+        width: 44,
+    },
+    appTitle: {
+        color: "#FFFFFF",
+        fontSize: 22,
+        fontWeight: "bold",
+    },
     navBar: {
         justifyContent: "space-evenly",
     },
