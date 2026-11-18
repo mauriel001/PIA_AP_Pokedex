@@ -75,6 +75,26 @@ export default StyleSheet.create({
         width: 180,
         height: 180,
     },
+    offlineState: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 12,
+        padding: 24,
+    },
+    offlineImage: {
+        width: 200,
+        height: 200,
+    },
+    offlineTitle: {
+        fontSize: 24,
+        fontWeight: "bold",
+        textAlign: "center",
+    },
+    offlineMessage: {
+        fontSize: 16,
+        textAlign: "center",
+    },
     emptyText: {
         fontSize: 20,
         fontWeight: "bold",

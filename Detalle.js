@@ -10,6 +10,8 @@ import {
 import { Card, ProgressBar } from "react-native-paper";
 import { colorPastel } from "./colores.js";
 import Alternativas from "./Alternativas";
+import OfflineMessage from "./OfflineMessage";
+import useNetworkRetry, { isNetworkError } from "./useNetworkRetry";
 
 const API_URL = "https://pokeapi.co/api/v2";
 
@@ -54,6 +56,7 @@ async function fetchJson(url, signal) {
 }
 
 export default function Detalle({ pokemon, onBack }) {
+  const { isOffline, retryKey } = useNetworkRetry();
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -74,7 +77,10 @@ export default function Detalle({ pokemon, onBack }) {
           fetchJson(
             `${API_URL}/pokemon-species/${pokemon.id}/`,
             controller.signal,
-          ).catch(() => null), // la descripción es opcional
+          ).catch((speciesError) => {
+            if (isNetworkError(speciesError)) throw speciesError;
+            return null;
+          }),
         ]);
 
         const descripcion = species?.flavor_text_entries?.find(
@@ -107,7 +113,7 @@ export default function Detalle({ pokemon, onBack }) {
       isActive = false;
       controller.abort();
     };
-  }, [pokemon.id]);
+  }, [pokemon.id, retryKey]);
 
   return (
     <ScrollView contentContainerStyle={estilos.contenedor}>
@@ -122,7 +128,9 @@ export default function Detalle({ pokemon, onBack }) {
 
       <Alternativas pokemon={pokemon} tiposEs={TIPOS_EN_ESPANOL} />
 
-      {loading ? (
+      {isOffline || isNetworkError(error) ? (
+        <OfflineMessage />
+      ) : loading ? (
         <ActivityIndicator
           style={{ marginTop: 24 }}
           accessibilityLabel="Cargando detalles"

@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import { Button, Card, Chip } from "react-native-paper";
 import { Image } from "expo-image";
+import OfflineMessage from "./OfflineMessage";
+import useNetworkRetry, { isNetworkError } from "./useNetworkRetry";
 
 const API_URL = "https://pokeapi.co/api/v2";
 const SPRITES_URL =
@@ -85,8 +87,8 @@ function clasificar(nombre, categoria) {
 const getIdFromUrl = (url) => Number(url.split("/").filter(Boolean).pop());
 const formatear = (texto) => texto.replace(/-/g, " ");
 
-async function fetchJson(url) {
-  const response = await fetch(url);
+async function fetchJson(url, signal) {
+  const response = await fetch(url, { signal });
   if (!response.ok) {
     throw new Error(`La solicitud a PokéAPI falló (${response.status}).`);
   }
@@ -104,16 +106,20 @@ const crearItem = (nombre, url, categoria) => {
 };
 
 // Devuelve las secciones de un bolsillo de la lista de arriba
-async function cargarBolsillo(bolsillo) {
+async function cargarBolsillo(bolsillo, signal) {
   const pockets = await Promise.all(
-    bolsillo.pockets.map((p) => fetchJson(`${API_URL}/item-pocket/${p}/`)),
+    bolsillo.pockets.map((p) =>
+      fetchJson(`${API_URL}/item-pocket/${p}/`, signal),
+    ),
   );
 
   // Quita categorías repetidas entre bolsillos
   const urls = [
     ...new Set(pockets.flatMap((p) => p.categories.map(({ url }) => url))),
   ];
-  const categorias = await Promise.all(urls.map((url) => fetchJson(url)));
+  const categorias = await Promise.all(
+    urls.map((url) => fetchJson(url, signal)),
+  );
 
   if (bolsillo.general) {
     const grupos = Object.fromEntries(GRUPOS.map((g) => [g.id, new Map()]));
@@ -143,41 +149,72 @@ async function cargarBolsillo(bolsillo) {
 }
 
 export default function Objetos() {
+  const { isOffline, retryKey } = useNetworkRetry();
   const [activo, setActivo] = useState(BOLSILLOS[0].id);
   const [datos, setDatos] = useState({}); // { idBolsillo: [secciones] }
   const [error, setError] = useState(null);
 
   const montado = useRef(true);
   const pidiendo = useRef({});
+  const controllers = useRef({});
+  const lastRetryKey = useRef(0);
 
   useEffect(() => {
     montado.current = true;
     return () => {
       montado.current = false;
+      Object.values(controllers.current).forEach((controller) =>
+        controller.abort(),
+      );
     };
   }, []);
 
-  const cargar = async (idBolsillo) => {
-    if (datos[idBolsillo] || pidiendo.current[idBolsillo]) return;
+  const cargar = async (idBolsillo, force = false) => {
+    if (
+      !force &&
+      (datos[idBolsillo] || pidiendo.current[idBolsillo])
+    ) {
+      return;
+    }
 
     const bolsillo = BOLSILLOS.find((b) => b.id === idBolsillo);
+    const controller = new AbortController();
+    controllers.current[idBolsillo]?.abort();
+    controllers.current[idBolsillo] = controller;
     pidiendo.current[idBolsillo] = true;
     setError(null);
 
     try {
-      const secciones = await cargarBolsillo(bolsillo);
-      if (!montado.current) return;
+      const secciones = await cargarBolsillo(
+        bolsillo,
+        controller.signal,
+      );
+      if (!montado.current || controller.signal.aborted) return;
       setDatos((prev) => ({ ...prev, [idBolsillo]: secciones }));
     } catch (err) {
-      if (montado.current) setError(err.message);
+      if (montado.current && err.name !== "AbortError") {
+        setError(err.message);
+      }
     } finally {
-      pidiendo.current[idBolsillo] = false;
+      if (controllers.current[idBolsillo] === controller) {
+        pidiendo.current[idBolsillo] = false;
+        delete controllers.current[idBolsillo];
+      }
     }
   };
 
   useEffect(() => {
-    cargar(activo);
-  }, [activo]);
+    const force = retryKey !== lastRetryKey.current;
+    lastRetryKey.current = retryKey;
+    cargar(activo, force);
+  }, [activo, retryKey]);
+
+  useEffect(() => {
+    if (!isOffline) return;
+    Object.values(controllers.current).forEach((controller) =>
+      controller.abort(),
+    );
+  }, [isOffline]);
 
   const secciones = datos[activo];
 
@@ -221,13 +258,15 @@ export default function Objetos() {
         </ScrollView>
       </View>
 
-      {error ? (
+      {isOffline || isNetworkError(error) ? (
+        <OfflineMessage />
+      ) : error ? (
         <View style={estilos.centro}>
           <Text accessibilityRole="alert">{error}</Text>
           <Button
             onPress={() => {
               setError(null);
-              cargar(activo);
+              cargar(activo, true);
             }}
           >
             Reintentar

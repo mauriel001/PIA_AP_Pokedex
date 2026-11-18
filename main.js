@@ -11,10 +11,14 @@ import { useAudioPlayer } from "expo-audio";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useEffect, useRef, useState } from "react";
 import Navigation from "./navigation";
+import OfflineMessage, {
+  OFFLINE_POKEMON_IMAGE_URL,
+} from "./OfflineMessage";
 import PokemonCard from "./PokemonCard";
 import Detalle from "./Detalle";
 import styles from "./styles.js";
 import Objetos from "./Objetos";
+import useNetworkRetry, { isNetworkError } from "./useNetworkRetry";
 
 const API_URL = "https://pokeapi.co/api/v2";
 const PAGE_SIZE = 50;
@@ -96,6 +100,7 @@ function getPokemonPage(entries, start, signal) {
 }
 
 export default function Main() {
+  const { isOffline, retryKey } = useNetworkRetry();
   const [entries, setEntries] = useState([]);
   const [pokemonData, setPokemonData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -117,6 +122,35 @@ export default function Main() {
 
   const listRef = useRef(null);
   const scrollOffsetRef = useRef(0);
+
+  useEffect(() => {
+    if (isOffline) return;
+
+    let isActive = true;
+    const prefetchOfflineImage = async () => {
+      try {
+        const prefetched = await Image.prefetch(OFFLINE_POKEMON_IMAGE_URL);
+        if (isActive && !prefetched) {
+          console.warn(
+            "No se pudo preparar la imagen para el modo sin conexión.",
+          );
+        }
+      } catch (error) {
+        if (isActive) {
+          console.warn(
+            "No se pudo preparar la imagen para el modo sin conexión:",
+            error,
+          );
+        }
+      }
+    };
+
+    prefetchOfflineImage();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isOffline]);
 
   // Cargar favoritos guardados
   useEffect(() => {
@@ -193,7 +227,7 @@ export default function Main() {
       isActive = false;
       controller.abort();
     };
-  }, [filter]);
+  }, [filter, retryKey]);
 
   // Restaurar la posición del scroll al cerrar el detalle
   useEffect(() => {
@@ -224,6 +258,7 @@ export default function Main() {
   useEffect(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
+      setError(null);
       setSearchResults([]);
       setSearching(false);
       return;
@@ -231,6 +266,7 @@ export default function Main() {
 
     const controller = new AbortController();
     let isActive = true;
+    setError(null);
     setSearching(true);
 
     // Espera 300 ms después de la última tecla para no saturar la API
@@ -258,7 +294,10 @@ export default function Main() {
       } catch (error) {
         if (error.name === "AbortError") return;
         console.warn("Error en la búsqueda:", error);
-        if (isActive) setSearchResults([]);
+        if (isActive) {
+          if (isNetworkError(error)) setError(error.message);
+          setSearchResults([]);
+        }
       } finally {
         if (isActive) setSearching(false);
       }
@@ -269,7 +308,7 @@ export default function Main() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [searchQuery]);
+  }, [searchQuery, retryKey]);
 
   // Cargar más pokémon al llegar al final de la lista
   const loadMore = async () => {
@@ -294,7 +333,10 @@ export default function Main() {
       if (controller.signal.aborted) return;
       setPokemonData((prev) => [...prev, ...nextPage]);
     } catch (error) {
-      if (!controller.signal.aborted) console.warn(error.message);
+      if (!controller.signal.aborted) {
+        console.warn(error.message);
+        if (isNetworkError(error)) setError(error.message);
+      }
     } finally {
       if (!controller.signal.aborted) {
         loadingMoreRef.current = false;
@@ -390,6 +432,9 @@ export default function Main() {
       >
         {activeView === "items" ? (
           <Objetos />
+        ) : activeView === "pokedex" &&
+          (isOffline || isNetworkError(error)) ? (
+          <OfflineMessage />
         ) : !isSearching && activeView === "favorites" && !favoritesReady ? (
           <ActivityIndicator accessibilityLabel="Cargando favoritos" />
         ) : !isSearching && activeView === "pokedex" && loading ? (

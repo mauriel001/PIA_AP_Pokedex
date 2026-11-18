@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { Card, IconButton } from "react-native-paper";
 import { Image } from "expo-image";
+import OfflineMessage from "./OfflineMessage";
+import useNetworkRetry, { isNetworkError } from "./useNetworkRetry";
 
 const API_URL = "https://pokeapi.co/api/v2";
 
@@ -27,7 +29,9 @@ async function fetchJson(url, signal) {
 }
 
 export default function Alternativas({ pokemon, tiposEs = {} }) {
+  const { isOffline, retryKey } = useNetworkRetry();
   const [formas, setFormas] = useState([]);
+  const [error, setError] = useState(null);
   const [ancho, setAncho] = useState(0);
   const [indice, setIndice] = useState(0);
   const listaRef = useRef(null);
@@ -37,6 +41,7 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
     let isActive = true;
     setFormas([]);
     setIndice(0);
+    setError(null);
 
     (async () => {
       try {
@@ -71,7 +76,10 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
 
         if (isActive) setFormas(detalles);
       } catch (error) {
-        if (error.name !== "AbortError") console.warn(error.message);
+        if (error.name !== "AbortError") {
+          console.warn(error.message);
+          if (isActive && isNetworkError(error)) setError(error.message);
+        }
       }
     })();
 
@@ -79,7 +87,7 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
       isActive = false;
       controller.abort();
     };
-  }, [pokemon.id]);
+  }, [pokemon.id, retryKey]);
 
   const paginas = [
     {
@@ -99,6 +107,8 @@ export default function Alternativas({ pokemon, tiposEs = {} }) {
   ];
 
   const hayFormas = formas.length > 0;
+
+  if (isOffline || isNetworkError(error)) return <OfflineMessage />;
 
   const irA = (nuevo) => {
     const destino = Math.max(0, Math.min(paginas.length - 1, nuevo));
