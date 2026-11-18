@@ -1,16 +1,16 @@
 {
   "expo": {
     "name": "PIA_AP_Pokedex",
-    "slug": "PIA_AP_Pokedex",
+    "slug": "pia-ap-pokedex",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/app-icon-square.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "com.tuequipo.pokedex",
+      "package": "com.mauriel.pokedex",
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/app-icon-square.png"
@@ -45,8 +45,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "bc834977-b50c-4517-aff5-a6671a98d582"
+        "projectId": "51976b72-4619-4e01-9848-a84d6614f947"
       }
-    }
+    },
+    "owner": "mauricio0p"
   }
 }
